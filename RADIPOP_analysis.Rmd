@@ -1,0 +1,981 @@
+---
+title: "Radipop data analysis and visualization"
+author: "Martin Watzenboeck"
+date: "01 24"
+output:
+  pdf_document: default
+  html_document: default
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = F, message = F, warning = F)
+######below code prepares the environment and loads the necessary files
+
+wd <- "C:/Users/marti/OneDrive - CeMM Research Center GmbH/stuff/sma/radipop_data_check//"
+
+setwd(wd)
+source("C:/Users/marti/OneDrive - CeMM Research Center GmbH/SOURCE/essentials_MW_v2.R")
+library(gridExtra)
+library(ComplexHeatmap)
+library(circlize)
+library(ggbeeswarm)
+library(survival)
+library(timeROC)
+library(survminer)
+library(cmprsk)
+library(haven)
+library(plotROC)
+library(pROC)
+library(egg)
+library(grid)
+library(gridExtra)
+library(ggdendro)
+
+
+#alternative heatmap color
+heatcol<-c("#67001F", "#B2182B", "#D6604D" ,"#F4A582","#FDDBC7","#F7F7F7", "#D1E5F0", "#92C5DE","#4393C3", "#2166AC","#053061") %>% rev
+heatcol2 <- heatcol[6:11]
+
+mypal <- brewer.pal(4, "Set1") %>% set_names(c("True", "Train", "Test", "Val"))
+
+theme_M_roc <- 
+   function () { 
+     theme_bw(base_size = 11) %+replace% 
+       theme(
+         plot.background = element_rect(fill="transparent", colour=NA), 
+         #panel.grid = element_line(colour = "grey92"), 
+         #panel.grid.minor = element_line(size = rel(0.5)),
+         panel.grid = element_blank(),
+         panel.grid.minor = element_blank(),
+         axis.text = element_text(color = NULL, size = rel(0.8))
+       ) }
+```
+
+```{r read data cohort, include=F}
+
+metadata_int <- read_excel("Celine_FINAL_RADIOPOP_DATA_with LRE Death_220708.xlsx")
+metadata_ext <- read_excel("External_validation_cohort_RADIPOP.xlsx")
+pred_values <- read_excel("Metadata_with_predictions.xlsx")
+#ext_pred_values <- read_excel("Metadata_ext_with_predictions.xlsx")
+
+if(!dir.exists("output")) dir.create("output")
+
+```
+
+
+Baseline data external validation cohort
+
+```{r demographic data, include=T}
+
+
+metadata_ext <- read_excel("../external_validation/External_validation_metadata.xlsx")
+
+#map etiology to codes
+codes <- list("ALD" = 1, "NAFLD" = 2, "Viral" = 3, "Other" = 4, "Unknown" = 5)
+
+metadata_ext$etiology %<>% map_chr(function(x) {
+  if(is.na(x)) return("Unknown") else
+    return(names(codes)[codes == x])
+})
+
+etiology_table <- 
+        table(metadata_ext$etiology)[c("ALD", "NAFLD", "Viral", "Unknown")] %>% 
+        as.list %>% 
+        as.data.frame 
+
+etiology_table[1,] %<>%
+  paste("(") %>%
+  paste0(
+  round((etiology_table[1,]/sum(etiology_table[1,])*100),2)
+) %>%
+  paste0("%)")
+  
+baseline_ext <- 
+  data.frame(
+      n_patients = nrow(metadata_ext),
+      age_mean_sd_sumNA = sprintf("%.1f (+-%.1f), unknown: %d", 
+                                  mean(metadata_ext$age, na.rm = T), 
+                                  sd(metadata_ext$age, na.rm = T), 
+                                  sum(is.na(metadata_ext$age))),
+      male_gender_sum_percent_sumNA  = sprintf("%d (%.1f%%), unknown: %d", 
+                                               sum(metadata_ext$sex == 1, na.rm = T), 
+                                               sum(metadata_ext$sex == 1, na.rm = T)/nrow(metadata_ext)*100, 
+                                               sum(is.na(metadata_ext$sex))),
+      hvpg_median_iqr_sumNA = sprintf("%.1f (%.0f), unknown: %d", 
+                                median(metadata_ext$HVPG),
+                                IQR(metadata_ext$HVPG),
+                                sum(is.na(metadata_ext$HVPG))),
+      csph_sum_percent = sprintf("%d (%.1f %%)",
+                                 sum(metadata_ext$HVPG >= 10),
+                                 sum(metadata_ext$HVPG >= 10)/nrow(metadata_ext)*100)
+      
+    ) %>% cbind(
+      etiology_table) %>%
+  cbind(
+    data.frame(
+        meld_median_iqr_sumNA = sprintf("%.1f (%.0f), unknown: %d", 
+                                median(metadata_ext$meld, na.rm = T),
+                                IQR(metadata_ext$meld, na.rm = T),
+                                sum(is.na(metadata_ext$meld), na.rm = T)),
+        cps_median_iqr_sumNA = sprintf("%.1f (%.0f), unknown: %d", 
+                                median(metadata_ext$cps, na.rm = T),
+                                IQR(metadata_ext$cps, na.rm = T),
+                                sum(is.na(metadata_ext$cps)), na.rm = T)
+    )
+  )
+
+
+baseline_ext %<>% 
+  t %>% 
+    as.data.frame %>% 
+    mutate(Variable = rownames(.))
+
+baseline_ext %<>%
+  dplyr::select(Variable, dplyr::everything())
+
+colnames(baseline_ext)[2] <- "Value"
+
+##add time difference ct/hvpg
+data_ext_td <- read_excel("../external_validation/Beajon cohort complete list included patients Radipop.xlsx", 
+                          sheet = "Radipop ext") %>%
+  subset(Radipop == 1)
+
+td_ext <- data.frame(Variable = "abs_time_difference_HVPG_CT_median_iqr",
+                     Value = sprintf("%.1f (%.0f), unknown: %d", 
+                                median(data_ext_td$`Betrag Diff CT HVPG`, na.rm = T),
+                                IQR(data_ext_td$`Betrag Diff CT HVPG`, na.rm = T),
+                                sum(is.na(data_ext_td$`Betrag Diff CT HVPG`))))
+
+baseline_ext <- rbind.data.frame(baseline_ext, td_ext)
+
+#baseline_ext %>% write_excel("output/Baselinedata_external_validation.xlsx")
+knitr::kable(baseline_ext %>% set_rownames(NULL)) 
+```
+
+```{r plot results prediction cross validation training cohort, include=T, fig.width=15, fig.height=7.5}
+
+data_train <- read_excel("model_training/CV_results_training_cohort.xlsx")
+
+scores_rf <- c(cor(data_train$RF_HVPG, data_train$True_HVPG),
+                cor(data_train$RF_HVPG, data_train$True_HVPG, method = "spearman"),
+                cor(data_train$RF_HVPG, data_train$True_HVPG)**2,
+                r2_score(data_train$RF_HVPG, data_train$True_HVPG),
+                cor.test(data_train$RF_HVPG, data_train$True_HVPG)$p.value
+) %>%
+                    set_names(c("Pearson_r",
+                                "Spearman_r",
+                                "R2",
+                                "R2_score",
+                                "pval_Pearson"))
+
+scatter_rf <- 
+  ggplot(data_train, aes(x = True_HVPG, y = RF_HVPG)) +
+    geom_smooth(method = "lm", se = F, color = "black", linetype = 2) +
+    geom_point(color = mypal["Train"], size = 2) +
+    geom_text(aes(x = 42, y = 5), label = sprintf("Pearson r =  %.2f", scores_rf["Pearson_r"])) +
+    ylab("Radiomics-HVPG") +
+    theme_classic() +
+    ggtitle("Random forest regression", subtitle = "5-fold CV, training set")
+
+print("Training data scores random forest")
+print(scores_rf)
+
+scores_en <- c(cor(data_train$EN_HVPG, data_train$True_HVPG),
+                cor(data_train$EN_HVPG, data_train$True_HVPG, method = "spearman"),
+                cor(data_train$EN_HVPG, data_train$True_HVPG)**2,
+                r2_score(data_train$EN_HVPG, data_train$True_HVPG),
+                cor.test(data_train$EN_HVPG, data_train$True_HVPG)$p.value) %>%
+                    set_names(c("Pearson_r",
+                                "Spearman_r",
+                                "R2",
+                                "R2_score",
+                                "pval_Pearson"))
+
+print("Training data scores elastic net")
+print(scores_en)
+
+scatter_en <- 
+  ggplot(data_train, aes(x = True_HVPG, y = EN_HVPG)) +
+    geom_smooth(method = "lm", se = F, color = "black", linetype = 2) +
+    geom_point(color = mypal["Train"], size = 2) +
+    geom_text(aes(x = 35, y = -15), label = sprintf("Pearson r =  %.2f", scores_en["Pearson_r"])) +
+    ylab("Radiomics-HVPG") +
+    theme_classic() +
+    ggtitle("Elastic net regression", subtitle = "5-fold CV, training set") 
+
+
+scatter_train <- ggarrange(scatter_rf, scatter_en, draw = F, nrow = 2) %>% to_grob(7, 7)
+
+
+grid.arrange(scatter_train)
+
+```
+
+
+Model performance - internal validation cohort
+
+```{r plot results prediction internal, include=T, fig.width=15, fig.height=7.5}
+
+
+scores_int <- c(cor(pred_values$HVPG, pred_values$rHVPG),
+                cor(pred_values$HVPG, pred_values$rHVPG, method = "spearman"),
+                cor(pred_values$HVPG, pred_values$rHVPG)**2,
+                r2_score(pred_values$rHVPG, pred_values$HVPG),
+                cor.test(pred_values$rHVPG, pred_values$HVPG)$p.value) %>%
+                    set_names(c("Pearson_r",
+                                "Spearman_r",
+                                "R2",
+                                "R2_score",
+                                "pval_Pearson"))
+
+scatter_int <- 
+  ggplot(pred_values, aes(x = HVPG, y = rHVPG)) +
+    geom_smooth(method = "lm", se = F, color = "black", linetype = 2) +
+    geom_point(color = mypal["Test"], size = 2) +
+    geom_text(aes(x = 27, y = 5), label = sprintf("Pearson r =  %.2f", scores_int["Pearson_r"])) +
+    ylab("Radiomics-HVPG") +
+    theme_classic() +
+    ggtitle("Test set (internal)")
+
+print(scores_int)
+
+
+
+ro_5 <- roc(pred_values$HVPG>=6, pred_values$rHVPG)
+
+roc_5 <- 
+   ggplot(pred_values, aes(d = factor(HVPG>=6), m = rHVPG)) +
+      geom_roc(increasing = T,  labels = F, pointsize = NA, 
+               color = mypal["Test"]) +
+      geom_abline(intercept = 0, slope = 1, linetype = 2) +
+      scale_x_continuous(expand=c(0.001,0.001)) +
+      scale_y_continuous(expand=c(0.001,0.001)) + 
+      ylab("Sensitivity") +
+      xlab("1 - Specificity") +
+      geom_text(x = 0.6, y = 0.3, label = sprintf("AUC = %.2f", ro_5$auc)) +
+      geom_text(x = 0.6, y = 0.2, label = sprintf("95%% CI = %.2f-%.2f", ci(ro_5)[1], ci(ro_5)[3])) +
+      theme_M_roc() +
+      ggtitle("HVPG >= 6")
+
+ro_10 <- roc(pred_values$HVPG>=10, pred_values$rHVPG)
+
+roc_10 <- 
+   ggplot(pred_values, aes(d = factor(HVPG>=10), m = rHVPG)) +
+      geom_roc(increasing = T,  labels = F, pointsize = NA, 
+               color = mypal["Test"]) +
+      geom_abline(intercept = 0, slope = 1, linetype = 2) +
+      scale_x_continuous(expand=c(0.001,0.001)) +
+      scale_y_continuous(expand=c(0.001,0.001)) + 
+      ylab("Sensitivity") +
+      xlab("1 - Specificity") +
+      geom_text(x = 0.6, y = 0.3, label = sprintf("AUC = %.2f", ro_10$auc)) +
+      geom_text(x = 0.6, y = 0.2, label = sprintf("95%% CI = %.2f-%.2f", ci(ro_10)[1], ci(ro_10)[3])) +
+      theme_M_roc() +
+      ggtitle("HVPG >= 10")
+
+ro_12 <- roc(pred_values$HVPG>=12, pred_values$rHVPG)
+
+roc_12 <- 
+   ggplot(pred_values, aes(d = factor(HVPG>=12), m = rHVPG)) +
+      geom_roc(increasing = T,  labels = F, pointsize = NA, 
+               color = mypal["Test"]) +
+      geom_abline(intercept = 0, slope = 1, linetype = 2) +
+      scale_x_continuous(expand=c(0.001,0.001)) +
+      scale_y_continuous(expand=c(0.001,0.001)) + 
+      ylab("Sensitivity") +
+      xlab("1 - Specificity") +
+      geom_text(x = 0.6, y = 0.3, label = sprintf("AUC = %.2f", ro_12$auc)) +
+      geom_text(x = 0.6, y = 0.2, label = sprintf("95%% CI = %.2f-%.2f", ci(ro_12)[1], ci(ro_12)[3])) +
+      theme_M_roc() +
+      ggtitle("HVPG >= 12")
+
+ro_16<- roc(pred_values$HVPG>=16, pred_values$rHVPG)
+
+roc_16 <- 
+   ggplot(pred_values, aes(d = factor(HVPG>=16), m = rHVPG)) +
+      geom_roc(increasing = T,  labels = F, pointsize = NA, 
+               color = mypal["Test"]) +
+      geom_abline(intercept = 0, slope = 1, linetype = 2) +
+      scale_x_continuous(expand=c(0.001,0.001)) +
+      scale_y_continuous(expand=c(0.001,0.001)) + 
+      ylab("Sensitivity") +
+      xlab("1 - Specificity") +
+      geom_text(x = 0.6, y = 0.3, label = sprintf("AUC = %.2f", ro_16$auc)) +
+      geom_text(x = 0.6, y = 0.2, label = sprintf("95%% CI = %.2f-%.2f", ci(ro_16)[1], ci(ro_16)[3])) +
+      theme_M_roc() +
+      ggtitle("HVPG >= 16")
+
+
+rocs <- 
+  ggarrange(roc_5, roc_10, roc_12, roc_16, nrow = 1, draw = F) %>%
+    to_grob(5, 5)
+
+scatter_int %<>%
+  to_grob(7, 7)
+
+grid.arrange(scatter_int, rocs, nrow = 2)
+
+```
+
+
+Model performance - internal validation cohort - compensated patients
+
+```{r plot results prediction only for compensated patients, include=T, fig.width=15, fig.height=7.5}
+
+info_comp <- data.frame(
+  ID = metadata_int$ID...1,
+  decomp = metadata_int$`decomp at BL yes(1) no (0)`
+)
+
+pred_values_comp <- 
+  join(pred_values, info_comp, by = "ID")
+
+pred_values_comp %<>%
+  subset(decomp == 0)
+
+
+
+scores_comp <- c(cor(pred_values_comp$HVPG, pred_values_comp$rHVPG),
+                cor(pred_values_comp$HVPG, pred_values_comp$rHVPG, method = "spearman"),
+                cor(pred_values_comp$HVPG, pred_values_comp$rHVPG)**2,
+                r2_score(pred_values_comp$rHVPG, pred_values_comp$HVPG),
+                cor.test(pred_values$rHVPG, pred_values$HVPG)$p.value) %>%
+                    set_names(c("Pearson_r",
+                                "Spearman_r",
+                                "R2",
+                                "R2_score",
+                                "pval_Pearson"))
+
+scatter_comp <- 
+  ggplot(pred_values_comp, aes(x = HVPG, y = rHVPG)) +
+    geom_smooth(method = "lm", se = F, color = "black", linetype = 2) +
+    geom_point(color = mypal["Test"], size = 2) +
+    geom_text(aes(x = 16, y = 5), label = sprintf("Pearson r =  %.2f", scores_comp["Pearson_r"])) +
+    ylab("Radiomics-HVPG") +
+    theme_classic() +
+    ggtitle("Test set (internal) - compensated patients")
+
+print(scores_comp)
+
+
+
+ro_5 <- roc(pred_values_comp$HVPG>=6, pred_values_comp$rHVPG)
+
+roc_5 <- 
+   ggplot(pred_values_comp, aes(d = factor(HVPG>=6), m = rHVPG)) +
+      geom_roc(increasing = T,  labels = F, pointsize = NA, 
+               color = mypal["Test"]) +
+      geom_abline(intercept = 0, slope = 1, linetype = 2) +
+      scale_x_continuous(expand=c(0.001,0.001)) +
+      scale_y_continuous(expand=c(0.001,0.001)) + 
+      ylab("Sensitivity") +
+      xlab("1 - Specificity") +
+      geom_text(x = 0.6, y = 0.3, label = sprintf("AUC = %.2f", ro_5$auc)) +
+      geom_text(x = 0.6, y = 0.2, label = sprintf("95%% CI = %.2f-%.2f", ci(ro_5)[1], ci(ro_5)[3])) +
+      theme_M_roc() +
+      ggtitle("HVPG >= 6")
+
+ro_10 <- roc(pred_values_comp$HVPG>=10, pred_values_comp$rHVPG)
+
+roc_10 <- 
+   ggplot(pred_values_comp, aes(d = factor(HVPG>=10), m = rHVPG)) +
+      geom_roc(increasing = T,  labels = F, pointsize = NA, 
+               color = mypal["Test"]) +
+      geom_abline(intercept = 0, slope = 1, linetype = 2) +
+      scale_x_continuous(expand=c(0.001,0.001)) +
+      scale_y_continuous(expand=c(0.001,0.001)) + 
+      ylab("Sensitivity") +
+      xlab("1 - Specificity") +
+      geom_text(x = 0.6, y = 0.3, label = sprintf("AUC = %.2f", ro_10$auc)) +
+      geom_text(x = 0.6, y = 0.2, label = sprintf("95%% CI = %.2f-%.2f", ci(ro_10)[1], ci(ro_10)[3])) +
+      theme_M_roc() +
+      ggtitle("HVPG >= 10")
+
+ro_12 <- roc(pred_values_comp$HVPG>=12, pred_values_comp$rHVPG)
+
+roc_12 <- 
+   ggplot(pred_values_comp, aes(d = factor(HVPG>=12), m = rHVPG)) +
+      geom_roc(increasing = T,  labels = F, pointsize = NA, 
+               color = mypal["Test"]) +
+      geom_abline(intercept = 0, slope = 1, linetype = 2) +
+      scale_x_continuous(expand=c(0.001,0.001)) +
+      scale_y_continuous(expand=c(0.001,0.001)) + 
+      ylab("Sensitivity") +
+      xlab("1 - Specificity") +
+      geom_text(x = 0.6, y = 0.3, label = sprintf("AUC = %.2f", ro_12$auc)) +
+      geom_text(x = 0.6, y = 0.2, label = sprintf("95%% CI = %.2f-%.2f", ci(ro_12)[1], ci(ro_12)[3])) +
+      theme_M_roc() +
+      ggtitle("HVPG >= 12")
+
+ro_16<- roc(pred_values_comp$HVPG>=16, pred_values_comp$rHVPG)
+
+roc_16 <- 
+   ggplot(pred_values_comp, aes(d = factor(HVPG>=16), m = rHVPG)) +
+      geom_roc(increasing = T,  labels = F, pointsize = NA, 
+               color = mypal["Test"]) +
+      geom_abline(intercept = 0, slope = 1, linetype = 2) +
+      scale_x_continuous(expand=c(0.001,0.001)) +
+      scale_y_continuous(expand=c(0.001,0.001)) + 
+      ylab("Sensitivity") +
+      xlab("1 - Specificity") +
+      geom_text(x = 0.6, y = 0.3, label = sprintf("AUC = %.2f", ro_16$auc)) +
+      geom_text(x = 0.6, y = 0.2, label = sprintf("95%% CI = %.2f-%.2f", ci(ro_16)[1], ci(ro_16)[3])) +
+      theme_M_roc() +
+      ggtitle("HVPG >= 16")
+
+
+rocs <- 
+  ggarrange(roc_5, roc_10, roc_12, roc_16, nrow = 1, draw = F) %>%
+    to_grob(5, 5)
+
+scatter_comp %<>%
+  to_grob(7, 7)
+
+grid.arrange(scatter_comp, rocs, nrow = 2)
+
+```
+
+
+
+Model performance - external validation cohort
+
+```{r plot results prediction external, include=T, fig.width=15, fig.height=8}
+
+pred_values <- read_excel("Metadata_ext_with_predictions.xlsx")
+
+scores_ext <- c(cor(pred_values$HVPG, pred_values$rHVPG),
+                cor(pred_values$HVPG, pred_values$rHVPG, method = "spearman"),
+                cor(pred_values$HVPG, pred_values$rHVPG)**2,
+                r2_score(pred_values$rHVPG, pred_values$HVPG),
+                cor.test(pred_values$rHVPG, pred_values$rHVPG)$p.value) %>%
+                    set_names(c("Pearson_r",
+                                "Spearman_r",
+                                "R2",
+                                "R2_score",
+                                "pval_Pearson"))
+
+scatter_ext <- 
+  ggplot(pred_values, aes(x = HVPG, y = rHVPG)) +
+    geom_smooth(method = "lm", se = F, color = "black", linetype = 2) +
+    geom_point(color = mypal["Val"], size = 2) +
+    geom_text(aes(x = 20, y = 5), label = sprintf("Pearson r =  %.2f", scores_ext["Pearson_r"])) +
+    ylab("Radiomics-HVPG") +
+    theme_classic() +
+    ggtitle("Test set (external)")
+
+print(scores_ext)
+
+
+
+ro_10 <- roc(pred_values$HVPG>=10, pred_values$rHVPG)
+
+roc_10 <- 
+   ggplot(pred_values, aes(d = factor(HVPG>=10), m = rHVPG)) +
+      geom_roc(increasing = T,  labels = F, pointsize = NA, 
+               color = mypal["Val"]) +
+      geom_abline(intercept = 0, slope = 1, linetype = 2) +
+      scale_x_continuous(expand=c(0.001,0.001)) +
+      scale_y_continuous(expand=c(0.001,0.001)) + 
+      ylab("Sensitivity") +
+      xlab("1 - Specificity") +
+      geom_text(x = 0.6, y = 0.3, label = sprintf("AUC = %.2f", ro_10$auc)) +
+      geom_text(x = 0.6, y = 0.2, label = sprintf("95%% CI = %.2f-%.2f", ci(ro_10)[1], ci(ro_10)[3])) +
+      theme_M_roc() +
+      ggtitle("HVPG >= 10")
+
+ro_12 <- roc(pred_values$HVPG>=12, pred_values$rHVPG)
+
+roc_12 <- 
+   ggplot(pred_values, aes(d = factor(HVPG>=12), m = rHVPG)) +
+      geom_roc(increasing = T,  labels = F, pointsize = NA, 
+               color = mypal["Val"]) +
+      geom_abline(intercept = 0, slope = 1, linetype = 2) +
+      scale_x_continuous(expand=c(0.001,0.001)) +
+      scale_y_continuous(expand=c(0.001,0.001)) + 
+      ylab("Sensitivity") +
+      xlab("1 - Specificity") +
+      geom_text(x = 0.6, y = 0.3, label = sprintf("AUC = %.2f", ro_12$auc)) +
+      geom_text(x = 0.6, y = 0.2, label = sprintf("95%% CI = %.2f-%.2f", ci(ro_12)[1], ci(ro_12)[3])) +
+      theme_M_roc() +
+      ggtitle("HVPG >= 12")
+
+ro_16<- roc(pred_values$HVPG>=16, pred_values$rHVPG)
+
+roc_16 <- 
+   ggplot(pred_values, aes(d = factor(HVPG>=16), m = rHVPG)) +
+      geom_roc(increasing = T,  labels = F, pointsize = NA, 
+               color = mypal["Val"]) +
+      geom_abline(intercept = 0, slope = 1, linetype = 2) +
+      scale_x_continuous(expand=c(0.001,0.001)) +
+      scale_y_continuous(expand=c(0.001,0.001)) + 
+      ylab("Sensitivity") +
+      xlab("1 - Specificity") +
+      geom_text(x = 0.6, y = 0.3, label = sprintf("AUC = %.2f", ro_16$auc)) +
+      geom_text(x = 0.6, y = 0.2, label = sprintf("95%% CI = %.2f-%.2f", ci(ro_16)[1], ci(ro_16)[3])) +
+      theme_M_roc() +
+      ggtitle("HVPG >= 16")
+
+
+rocs <- 
+  ggarrange(roc_10, roc_12, roc_16, nrow = 1, draw = F) %>%
+    to_grob(5, 5)
+
+scatter_ext %<>%
+  to_grob(7, 7)
+
+grid.arrange(scatter_ext, rocs, nrow = 2)
+
+```
+
+
+Outcome prediction - Survival analysis
+
+```{r Survival analysis c Lorenz, include=T,  fig.width=15, fig.height=8}
+
+pred_values <- read_excel("Metadata_with_predictions.xlsx")
+
+dat <- metadata_int
+
+dat$ID <- dat$ID...1
+
+dat %<>% join(data.frame(ID = pred_values$ID, HVPG = pred_values$HVPG, rHVPG = pred_values$rHVPG), by = "ID")
+
+dat %<>% subset(dat$`Training = 0, Testing = 1` == 1)
+
+#calculate median time to follow up for validation patients
+fit <- survfit(Surv(dat$`LRE duration (months) from CT`,dat$`LRE FU yes (1) no (0)` == 0) ~ 1)
+print("Median time to follow up")
+print(surv_median(fit))
+
+#cumulative incidence
+print("Cumulative incidence at x months")
+print(cuminc(dat$`LRE duration (months) from CT`, dat$`LRE FU yes (1) no (0)`) %>% timepoints(c(12, 24, 36, 48, 60)))
+
+#percentage of patients that got events
+print(sprintf("Liver related death %d, %2.f %%", sum(dat$`LRD yes (1) no (0)`), sum(dat$`LRD yes (1) no (0)`)/nrow(dat)*100))
+
+print(sprintf("Liver related events %d, %2.f %%", sum(dat$`LRE FU yes (1) no (0)`), 
+              sum(dat$`LRE FU yes (1) no (0)`)/nrow(dat)*100))
+
+
+
+
+
+dat$ETIO <- factor(dat$`ETIOcoded 1=ALD, 2=NAFLD, 3=Viral, 4=Other, 5=Unknown`)
+dat$CPS <- dat$`BL-CPS_calc_w_INR` #%>% cut(breaks = c(7, 10))
+
+#probieren hvpg <6, 6-9, 10-15, 16+
+#hvpg <>10
+
+convert_p_value <- function(pval) {
+  map_chr(pval, function(x) {
+    if(x>= 0.001) {
+      return(x %>% round(3) %>% as.character)
+    } else {
+      return("<0.001")
+    }
+  })
+}
+
+convert_summary_to_table <- function(summary_res) {
+  
+  df <- summary_res$conf.int %>% as.data.frame
+  df_for_pval <- summary_res$coefficients %>% as.data.frame
+  
+  df_cleaned <- data.frame(patient_characteristics = rownames(df),
+                           HR_95percentCI = paste0(round(df$`exp(coef)`, 2), " (", round(df$`lower .95`, 2), "-", round(df$`upper .95`,2), ")"),
+                           p_value = df_for_pval$`Pr(>|z|)` %>% convert_p_value
+                           
+  )
+  
+  df_cleaned$patient_characteristics %<>% gsub("dat\\$", "", .)
+  
+  return(df_cleaned)
+  
+}
+  
+
+#Cox regressions - LRE univariable
+
+df_univariable <- rbind.data.frame(
+
+  summary(coxph(Surv(dat$`LRE duration (months) from CT`,dat$`LRE FU yes (1) no (0)`) ~ dat$`age at CT`)) %>% convert_summary_to_table,
+  #summary(coxph(Surv(dat$`LRE duration (months) from CT`,dat$`LRE FU yes (1) no (0)`) ~ dat$`ETIO`)) %>% convert_summary_to_table,
+  summary(coxph(Surv(dat$`LRE duration (months) from CT`,dat$`LRE FU yes (1) no (0)`) ~ dat$`CPS`)) %>% convert_summary_to_table,
+  summary(coxph(Surv(dat$`LRE duration (months) from CT`,dat$`LRE FU yes (1) no (0)`) ~ dat$`BL-MELD_UNOS_2016`)) %>% convert_summary_to_table,
+  summary(coxph(Surv(dat$`LRE duration (months) from CT`,dat$`LRE FU yes (1) no (0)`) ~ dat$`Decompensated_0=BAVENO1_012;1=BAVENO1_345`)) %>% convert_summary_to_table,
+  summary(coxph(Surv(dat$`LRE duration (months) from CT`,dat$`LRE FU yes (1) no (0)`) ~ dat$`Na`)) %>% convert_summary_to_table,
+  summary(coxph(Surv(dat$`LRE duration (months) from CT`,dat$`LRE FU yes (1) no (0)`) ~ dat$`Krea`)) %>% convert_summary_to_table,
+  summary(coxph(Surv(dat$`LRE duration (months) from CT`,dat$`LRE FU yes (1) no (0)`) ~ dat$`Alb`)) %>% convert_summary_to_table,
+  summary(coxph(Surv(dat$`LRE duration (months) from CT`,dat$`LRE FU yes (1) no (0)`) ~ dat$`CRP`)) %>% convert_summary_to_table,
+  summary(coxph(Surv(dat$`LRE duration (months) from CT`,dat$`LRE FU yes (1) no (0)`) ~ dat$`HVPG`)) %>% convert_summary_to_table,
+  summary(coxph(Surv(dat$`LRE duration (months) from CT`,dat$`LRE FU yes (1) no (0)`) ~ dat$`rHVPG`)) %>% convert_summary_to_table
+
+)
+
+#multivariable CPS
+#CPS with true HVPG
+CPS_actual <- coxph(Surv(dat$`LRE duration (months) from CT`,dat$`LRE FU yes (1) no (0)`) ~ #dat$`ETIO` + 
+                                                                                            dat$`CPS` + 
+                                                                                            dat$`Na` + 
+                                                                                            #dat$`Krea` + 
+                                                                                            dat$`CRP` + 
+                                                                                            dat$`HVPG`)
+df_CPS_actual <- summary(CPS_actual) %>% convert_summary_to_table
+                                    
+                                    
+AIC <- extractAIC(CPS_actual)[2]
+CI_SEM <- sprintf("%.3f +/- %.3f", CPS_actual$concordance[length(CPS_actual$concordance)-1],    
+                                   CPS_actual$concordance[length(CPS_actual$concordance)])
+
+df_model_performance <- data.frame(model = "CPS_trueHVPG", AIC = AIC, Concordance_SEM = CI_SEM)
+
+
+#multivariable CPS
+#CPS with predicted HVPG
+
+CPS_pred <- coxph(Surv(dat$`LRE duration (months) from CT`,dat$`LRE FU yes (1) no (0)`) ~ #dat$`ETIO` + 
+                                                                                          dat$`CPS` + 
+                                                                                          dat$`Na` + 
+                                                                                          #dat$`Krea` + 
+                                                                                          dat$`CRP` + 
+                                                                                          dat$`rHVPG`)
+df_CPS_pred <- summary(CPS_pred) %>% convert_summary_to_table
+
+AIC <- extractAIC(CPS_pred)[2]
+CI_SEM <- sprintf("%.3f +/- %.3f", CPS_pred$concordance[length(CPS_pred$concordance)-1],    
+                                   CPS_pred$concordance[length(CPS_pred$concordance)])
+
+df_model_performance  %<>% rbind.data.frame(data.frame(model = "CPS_radiomicsHVPG", AIC = AIC, Concordance_SEM = CI_SEM))
+
+#multivariable MELD
+#MELD with true HVPG
+
+MELD_actual <- coxph(Surv(dat$`LRE duration (months) from CT`,dat$`LRE FU yes (1) no (0)`) ~ #dat$`ETIO` + 
+                                                                                             dat$`BL-MELD_UNOS_2016` +
+                                                                                             #dat$`Decompensated_0=BAVENO1_012;1=BAVENO1_345` +
+                                                                                             dat$`Alb` + 
+                                                                                             #dat$`CRP` + 
+                                                                                             dat$`HVPG`)
+df_MELD_actual <- summary(MELD_actual) %>% convert_summary_to_table
+
+AIC <- extractAIC(MELD_actual)[2]
+CI_SEM <- sprintf("%.3f +/- %.3f", MELD_actual$concordance[length(MELD_actual$concordance)-1],    
+                                   MELD_actual$concordance[length(MELD_actual$concordance)])
+
+df_model_performance  %<>% rbind.data.frame(data.frame(model = "MELD_trueHVPG", AIC = AIC, Concordance_SEM = CI_SEM))
+
+#MELD with predicted HVPG
+MELD_pred <- coxph(Surv(dat$`LRE duration (months) from CT`,dat$`LRE FU yes (1) no (0)`) ~ #dat$`ETIO` + 
+                                                                                           dat$`BL-MELD_UNOS_2016` +
+                                                                                           #dat$`Decompensated_0=BAVENO1_012;1=BAVENO1_345` +
+                                                                                           dat$`Alb` + 
+                                                                                           #dat$`CRP` + 
+                                                                                           dat$`rHVPG`)
+df_MELD_pred <- summary(MELD_pred) %>% convert_summary_to_table
+
+AIC <- extractAIC(MELD_pred)[2]
+CI_SEM <- sprintf("%.3f +/- %.3f", MELD_pred$concordance[length(MELD_pred$concordance)-1],    
+                                   MELD_pred$concordance[length(MELD_pred$concordance)])
+
+df_model_performance  %<>% rbind.data.frame(data.frame(model = "MELD_radiomicsHVPG", AIC = AIC, Concordance_SEM = CI_SEM))
+
+
+#cox regression for csph
+binary_cox <- rbind.data.frame(
+  summary(coxph(Surv(dat$`LRE duration (months) from CT`,dat$`LRE FU yes (1) no (0)`) ~ (dat$`HVPG`>= 10))) %>% 
+    convert_summary_to_table,
+  summary(coxph(Surv(dat$`LRE duration (months) from CT`,dat$`LRE FU yes (1) no (0)`) ~ (dat$`rHVPG`>= 10))) %>% 
+    convert_summary_to_table)
+
+print("CSPH univariable")
+knitr::kable(binary_cox)
+
+
+#plot survival curves
+fit <- survfit(Surv(dat$`LRE duration (months) from CT`,dat$`LRE FU yes (1) no (0)`) ~ (dat$`HVPG` >= 10), data = dat)
+
+g_actual <- 
+  ggsurvplot(
+    fit,
+    #data = lung,
+    size = 1,                 # change line size
+    palette =
+      c("black", "#E41A1C"),# custom color palettes
+    conf.int = F,          # Add confidence interval
+    pval = TRUE,              # Add p-value
+    risk.table = TRUE,        # Add risk table
+    risk.table.col = "strata",# Risk table color by groups
+    legend.labs =
+      c("HVPG <10", "HVPG>=10"),    # Change legend labels
+    risk.table.height = 0.25, # Useful to change when you have multiple groups
+    ylab = "LRE free survival",
+    ggtheme = theme_classic()      # Change ggplot2 theme
+  )
+
+fit <- survfit(Surv(dat$`LRE duration (months) from CT`,dat$`LRE FU yes (1) no (0)`) ~ (dat$`rHVPG` >= 10), data = dat)
+
+
+g_radiomics <- 
+  ggsurvplot(
+    fit,
+    #data = lung,
+    size = 1,                 # change line size
+    palette = c("black", "#4DAF4A"),# custom color palettes
+    conf.int = F,          # Add confidence interval
+    pval = TRUE,              # Add p-value
+    risk.table = TRUE,        # Add risk table
+    risk.table.col = "strata",# Risk table color by groups
+    legend.labs =
+      c("radiomics-HVPG <10", "radiomics-HVPG>=10"),    # Change legend labels
+    risk.table.height = 0.25, # Useful to change when you have multiple groups
+    ylab = "LRE free survival",
+    ggtheme = theme_classic()      # Change ggplot2 theme
+    )
+
+
+
+
+# AUROCs LRE
+#function to convert aurocs for plotting
+
+convert_timeROC <- function(aurocobj) {
+  
+  cis <- 
+    confint(aurocobj)$CI_AUC %>% 
+      as.data.frame
+  
+  cis <- cis/100
+  
+  cis$time <- rownames(cis) %>% gsub("t=", "", .) %>% as.numeric
+  
+  cis$AUC <- aurocobj$AUC
+
+  return(cis %>% set_colnames(c("lower_bound", "upper_bound", "time", "AUC")))  
+}
+
+
+AUROC_actualHVPGstrata <- timeROC(dat$`LRE duration (months) from CT`,dat$`LRE FU yes (1) no (0)`,dat$HVPG,
+                            #other_markers=as.matrix(dat[,c("ETIO","CPS","Na","Krea","CRP")]), 
+                            cause=1, weighting="marginal",times=c(12,24,36,48,60),ROC=TRUE,iid=TRUE)
+
+actual_df <- AUROC_actualHVPGstrata %>% convert_timeROC
+
+AUROC_predHVPGstrata <- timeROC(dat$`LRE duration (months) from CT`,dat$`LRE FU yes (1) no (0)`, dat$rHVPG,
+                                  #other_markers=as.matrix(dat[,c("ETIO","CPS","Na","Krea","CRP")]), 
+                                  cause=1, weighting="marginal",times=c(12,24,36,48,60),ROC=TRUE,iid=TRUE)
+
+radiomics_df <- AUROC_predHVPGstrata %>% convert_timeROC
+
+plotdf_roc <-
+  rbind.data.frame(
+    actual_df %>% mutate(Data = "HVPG"),
+    radiomics_df %>% mutate(Data = "Radiomics-HVPG")
+  )
+
+g_roc <- 
+  ggplot(plotdf_roc, aes(x = time, y = AUC)) +
+    geom_path(aes(color = Data, x = time, y = AUC)) +
+    geom_errorbar(aes(color = Data, ymin = lower_bound, ymax = upper_bound), position = position_dodge(width = 1)) +
+    scale_color_manual(values = mypal[c(1, 3)]%>% set_names(NULL)) +
+    scale_fill_manual(values = mypal[c(1, 3)]%>% set_names(NULL)) +
+    scale_x_continuous(labels = c(12,24,36,48,60), breaks = c(12,24,36,48,60)) +
+    ylab("Time dependent AUC (95% CI)") +
+    xlab("Time") +
+    coord_cartesian(ylim = c(0, 1), xlim = c(5, 67), expand = F) +
+    theme_classic() +
+    ggtitle("Time dependent AUCs")
+
+g_roc %<>% to_grob(width = 7.5, height = 5)
+
+g_actual <- g_actual$plot + ggtitle("HVPG")
+g_radiomics <- g_radiomics$plot + ggtitle("Radiomics-HVPG")
+
+g_surv <- 
+  ggarrange(g_actual, g_radiomics, draw = F) %>% 
+    to_grob(width = 7.5, height = 5)
+
+
+print("Univariable associations")
+knitr::kable(df_univariable)
+
+print("Multivariable (CPS, actual HVPG)")
+knitr::kable(df_CPS_actual)
+
+print("Multivariable (CPS, radiomics HVPG)")
+knitr::kable(df_CPS_pred)
+
+print("Multivariable (MELD, actual HVPG)")
+knitr::kable(df_MELD_actual)
+
+print("Multivariable (MELD, radiomics HVPG)")
+knitr::kable(df_MELD_pred)
+
+print("Performance metrics")
+knitr::kable(df_model_performance)
+
+
+grid.arrange(g_roc)
+grid.arrange(g_surv)
+
+
+```
+
+
+
+
+Feature selection - heatmap 
+
+```{r Feature selection heatmap, include=T,  fig.width=5, fig.height=3}
+
+feats <- read.csv("csv_rawFeatures_s20220720.csv")
+colnames(feats)[1] <- "ID"
+
+ids_train <- 
+  metadata_int$ID...1  %>% 
+    subset(metadata_int$`Training = 0, Testing = 1` == 0)
+
+ids_test <- 
+  metadata_int$ID...1  %>% 
+    subset(metadata_int$`Training = 0, Testing = 1` == 1)
+
+feats_train <- 
+  join(data.frame(ID = ids_train), feats, by = "ID")
+
+feats_test <- 
+  join(data.frame(ID = ids_test), feats, by = "ID")
+
+
+rawdata <- feats_train %>% dplyr::select(-ID)
+
+corm <- cor(rawdata, method = "spearman")
+distm <- as.dist(1- abs(corm))
+cob <- hclust(distm, method = "ward.D2")
+
+#create the heatmap
+mat <- abs(corm)
+
+heatcol_sim <- brewer.pal(11, "RdYlBu")[2:10] %>% rev
+col = circlize::colorRamp2(seq(0,1, length.out = length(heatcol_sim)), heatcol_sim)
+
+
+hm <- 
+  Heatmap(mat, 
+          name = "Spearman correlation",
+          show_column_names = F,
+          show_row_names = F,
+          cluster_rows = cob,
+          cluster_columns = cob,
+          show_column_dend = F,
+          row_dend_width = unit(2, "cm"),
+          col = col,
+          width = unit(5, "cm"),
+          height = unit(5, "cm")
+          )
+
+draw(hm)
+
+
+
+```
+
+
+```{r Feature dendrogram plotting, include=T, fig.width=15, fig.height=8}
+
+gd <- 
+  ggdendrogram(cob, labels = F) +
+    geom_hline(yintercept = 1.2475405520173637, color = "red") +
+    xlab("Features") +
+    ylab(NULL) +
+    theme_classic() +
+    theme(axis.text.x=element_blank(), 
+          axis.ticks.x=element_blank()) +
+    ggtitle("Feature selection")
+
+gd %<>% to_grob(12, 7.5)
+
+grid.arrange(gd)
+
+```
+
+Feature importance
+
+```{r Feature importance plotting, include=T, fig.width=15, fig.height=8}
+
+feats <- read.csv("csv_rawFeatures_s20220720.csv")
+feature_importance <- read_excel("Feature_importances_RF_regressor.xlsx")
+colnames(feats)[1] <- "ID"
+
+ids_train <- 
+  metadata_int$ID...1  %>% 
+    subset(metadata_int$`Training = 0, Testing = 1` == 0)
+
+ids_test <- 
+  metadata_int$ID...1  %>% 
+    subset(metadata_int$`Training = 0, Testing = 1` == 1)
+
+feats_train <- 
+  join(data.frame(ID = ids_train), feats, by = "ID")
+
+feats_test <- 
+  join(data.frame(ID = ids_test), feats, by = "ID")
+
+#define hvpg
+hvpg <-   
+  metadata_int$`BL_HVPG_corrected (ohne Kollat., inkor. Messungen)`  %>% 
+    subset(metadata_int$`Training = 0, Testing = 1` == 1)
+
+#get raw data
+rawdata <- feats_train %>% 
+  dplyr::select(feature_importance$feature %>% gsub("-", "\\.", .) %>% head(10))
+
+#order according to hvpg
+rawdata <- rawdata[order(hvpg), ]
+hvpg <- hvpg[order(hvpg)]
+
+scale2 <- 
+  function(df) {
+    apply(df, 2, function(col) (col- mean(col))/sd(col))
+  }
+
+mat <- 
+  rawdata %>%
+    scale2 %>% 
+    as.matrix %>%
+    t
+
+
+
+colbreaks <- seq(-2.5, 2.5, length.out = length(heatcol))
+
+col <- circlize::colorRamp2(colbreaks,
+                            colors = heatcol)
+
+
+#create the heatmap
+hm <- 
+  Heatmap(mat,
+          col = col,
+          cluster_rows = T,
+          cluster_columns = F
+          )
+
+#not really informative
+
+# 10 most important features
+
+feature_importance$feature %<>% factor(levels = rev(unique(.)))
+
+g_fi <- 
+  ggplot(feature_importance %>% head(10), aes(x = feature, y = importance)) +
+    geom_bar(fill = mypal["Train"], stat = "identity") +
+    coord_flip(ylim = c(0, 0.35), expand = F) +
+    ylab("Importance") +
+    xlab(NULL) +
+    theme_classic() +
+    ggtitle("10 most important features")
+  
+
+grid.arrange(g_fi %>% to_grob(5, 5))
+```
+
