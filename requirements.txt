@@ -1,0 +1,25 @@
+# This file may be used to create an environment using:
+# $ conda create --name <env> --file <this file>
+# perhapes some channels need to be added
+#
+# Note that the requirements are also in the corresponding pyproject.toml files.
+numpy
+pydicom
+scikit-image
+scipy
+SimpleITK
+pandas
+matplotlib
+tqdm
+
+torch  # it is strongly recommended install PyTorch as described on their website (conda/pip).
+monai
+
+# These are usefull for automatically building the documentation:
+sphinx
+sphinxcontrib-napoleon
+sphinx-autobuild
+sphinx-rtd-theme
+sphinx-autoapi
+
+pytest
