@@ -10,14 +10,14 @@ This allows you to install them simply with
 pip install -e .
 ```
 
-
+<!-- 
 ## Example `.env`
 
 The path to the dataset in the provided sample notebooks read from a `.env` file. 
-This will be different for your dataset. Please create a `.env` file with the following entires, 
+This will be different for your dataset. Please create a `.env` file with the following entires, or change the notebooks accordingly
 ```bash
-RADIPOP_DATAROOT_DIR=....
-RADIPOP_PACKAGE_ROOT=<path_to_this_folder>
+local_user=cwatzenboeck
+DATA_ROOT_DIRECTORY=/home/${local_user}/data/cirdata
 ```
 or store them as environment variables.
 
@@ -32,7 +32,7 @@ load_dotenv()
 from dotenv import dotenv_values
 
 config = dotenv_values(".env"),  # load environment variables as dictionary
-```
+``` -->
 
 _________________
 
