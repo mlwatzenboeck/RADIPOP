@@ -34,7 +34,8 @@ dependencies = [
     "numba",
     "scipy",
     "scikit-learn",
-    "scikit-optimize"
+    "scikit-optimize", 
+    "scikit-image"
 ]
 
 [project.scripts]
