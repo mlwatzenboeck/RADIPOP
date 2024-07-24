@@ -12,15 +12,27 @@ Additional related scripts for the feature extraction of the training cohort are
 
 Our custom segmentation software can be provided upon request.
 
-### Main components
+<!-- 
+<img src="https://user-images.githubusercontent.com/24319152/237040958-8ee75b95-eb99-4b91-a0b1-7c9071f80a96.png" style="width: 55vw; min-width: 330px;"> -->
+
+ 
+<img src="fig/title_image.png" style="width: 55vw; min-width: 330px;">
+
+
+### Main content
 
 Most important scripts with which the analysis of this manuscript are
 - [`RADIPOP_extract_features_external_validation.ipynb`](notebooks/RADIPOP_extract_features_external_validation.ipynb)
-  This script was used to extract the features for the external validation cohort with the same pipeline as used for the [training cohort](https://github.com/menchelab/radipop_scripts)
+  This Jupyter notebook was used for preprocessing and feature extraction of the external validation cohort with the same methodology as used for the [training cohort](https://github.com/menchelab/radipop_scripts)
 
 - [`RADIPOP_model_training.ipynb`](notebooks/RADIPOP_model_training.ipynb)
-  TODO add description
-- [`RADIPOP_analysis.Rmd`](R/RADIPOP_analysis.Rmd) some data analysis and plots done with *R*
+  This Jupyter notebook performs feature reduction, hyperparameter selection as well as model training and evaluation on internal and external validation cohorts.
+  Feature reduction is performed by calculating pairwise Spearman correlations between individual features and hierarchical clustering. The threshold (i.e., height at which the dendrogram was cut) to form clusters is considered a hyperparameter. Hyperparameter selection for random forest or elastic net regression models is performed using Bayesian Optimization.
+
+- [`RADIPOP_analysis.Rmd`](R/RADIPOP_analysis.Rmd) 
+  This RMarkdown notebook contains analysis and visualization steps for model performance evaluation on internal and external validation cohorts. Furthermore, the power of HVPG predicted by radiomic features ("radio-HVPG") versus invasively measured HVPG to predict a composite endpoint of cirrhosis decompensation/liver-related death is evaluated.
+
+
 
 <!-- Moreover, we provide a pipeline and a brief tutorial how to make a similar analysis with your own data.  -->
 
