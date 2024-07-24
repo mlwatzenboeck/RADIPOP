@@ -1,4 +1,14 @@
-# RADIPOP
+# RADIPOP  -- CT Radiomics for Portal Hypertension
+
+This repository accompanies the manuscript *Radiomics-based assessment of portal hypertension severity and risk stratification of cirrhotic patients using routine CT scans* submitted as (*Sin, Watzenboeck et al. 2024*).
+It contains scripts and tools used in the study for radiomics analysis, including image processing, feature extraction, feature selection, and model training.
+
+For additional scripts related to this study can be found [https://github.com/menchelab/radipop_scripts](https://github.com/menchelab/radipop_scripts). 
+
+Our custom segmentation software can be provided on request. For more information, visit Radipop Scripts and RADIPOP.
+
+
+
 
 ## Install instructions: 
 
