@@ -20,7 +20,10 @@ import tempfile
 import shutil
 import re 
 from collections import defaultdict
+from radiomics import featureextractor
 
+import SimpleITK as sitk
+import SimpleITK  # for type hinting
 
 
 def dcm2nii(dicom_folder: Path, output_folder: Path, verbose: bool = True, out_id: Optional[str] = None) -> None:
@@ -127,3 +130,46 @@ def get_files_dict_by_regex_pattern(base_path, regex_pattern, strict=True):
                 results[patient_name] = matched_files
     
     return dict(results)
+
+
+
+def suggest_radiomics_binwidth(img: SimpleITK.SimpleITK.Image,
+                               mask: SimpleITK.SimpleITK.Image, 
+                               settings: dict = {
+                                   "binWidth": 1, 
+                                   "resampledPixelSpacing": [1, 1, 1],  # use None for no resampling
+                                   "interpolator": sitk.sitkBSpline, 
+                                   "padDistance": 10,
+                               }):
+    """Run extraction with only the first-order feature: Range to suggest a decent binwidth
+    
+    Make sure to provide the other settings according consistent with your yaml file
+    """
+
+
+    # Initialize feature extractor
+    extractor = featureextractor.RadiomicsFeatureExtractor(**settings)
+
+    # Disable all classes except firstorder
+    extractor.disableAllFeatures()
+
+    # Only enable Range in firstorder
+    extractor.enableFeaturesByName(firstorder=['Range'])
+
+    print("Calculating features")
+    extracted_features = extractor.execute(img, mask)
+
+    features = {}
+    for key in extracted_features.keys():
+        if not key.startswith("diagnostics_"):
+            features[key] = np.float64(extracted_features[key])       
+    features = pd.DataFrame(features, index = [0])
+    # display(features)
+
+    r = features.loc[0, "original_firstorder_Range"]
+    ratio = r / settings['binWidth']   # should be ~16-128 bins
+
+    print(f"Range / binWidth =  {ratio}  (should be 16-128)")
+    
+    print(f"Suggestion:  Use a binwith of ~ ", r / ((128 + 16)*0.5))
+    return r / ((128 + 16)*0.5)
