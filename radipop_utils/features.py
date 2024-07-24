@@ -1,20 +1,41 @@
 import os
-import pydicom
-from pathlib import Path
-import nibabel as nib
-import dicom2nifti
-import numpy as np
-from matplotlib import pyplot as plt
 import importlib
 import pickle
-import SimpleITK as sitk
-import SimpleITK # for type hinting
+import time
+from pathlib import Path
+from collections import defaultdict
 from typing import List, Union, Dict
-from radiomics import featureextractor as extractor
+
+import numpy as np
 import pandas as pd
+import nibabel as nib
+import pydicom
+import dicom2nifti
 import dicom2nifti.settings as settings
-settings.disable_validate_slice_increment()
+import SimpleITK as sitk
+import SimpleITK  # for type hinting
+import skopt
+import numba
 from PIL import Image
+from matplotlib import pyplot as plt
+import matplotlib.pyplot as plt
+import seaborn as sns
+from radiomics import featureextractor as extractor
+from scipy.cluster import hierarchy
+from scipy.spatial.distance import squareform
+from scipy.stats import spearmanr, pearsonr, ttest_ind
+from sklearn.base import BaseEstimator, TransformerMixin
+from sklearn.ensemble import RandomForestClassifier, RandomForestRegressor
+from sklearn.feature_selection import SelectFromModel
+from sklearn.linear_model import ElasticNet
+from sklearn.metrics import roc_auc_score, roc_curve, r2_score
+from sklearn.model_selection import KFold, GridSearchCV, RandomizedSearchCV
+from sklearn.pipeline import Pipeline
+from sklearn.preprocessing import StandardScaler
+
+# Disable validation of slice increment for dicom2nifti
+# settings.disable_validate_slice_increment()
+
 
 
 
@@ -107,12 +128,66 @@ def extract_and_save_features_from_nii(patientid: str, image_loc: Union[Path, st
 
 
 
+
+
+def get_most_corr(f, data_train, Y_train):
+    "Get the most associated variable from a cluster"
+    if len(f) == 0:
+        return None
+    corrcoefs = [spearmanr(Y_train, data_train[:,x])[0] for x in f]
+    return f[np.argmax(np.abs(corrcoefs))]
+
+class SpearmanReducerCont(BaseEstimator, TransformerMixin):
+    "custom feature reduction method based on spearman correlations"
+        
+    def __init__(self, split_param = 1):
+        self.split_param = split_param
+    
+    def fit(self, X, y=None):
+        
+        if self.split_param is None:
+            
+            self.selected_features = list(np.arange(X.shape[1]))
+            return self
+        
+        else:
+            #calculate correlation matrix
+            corr = spearmanr(X).correlation
+
+            # Ensure the correlation matrix is symmetric
+            corr = (corr + corr.T) / 2
+            np.fill_diagonal(corr, 1)
+
+            # We convert the correlation matrix to a distance matrix before performing
+            # hierarchical clustering using Ward's linkage.
+            distance_matrix = 1 - np.abs(corr)
+            dist_linkage = hierarchy.ward(squareform(distance_matrix))
+            cluster_ids = hierarchy.fcluster(dist_linkage, self.split_param, criterion="distance")
+            cluster_id_to_feature_ids = defaultdict(list)
+            for idx, cluster_id in enumerate(cluster_ids):
+                cluster_id_to_feature_ids[cluster_id].append(idx)
+
+            self.selected_features = [get_most_corr(v, X, y) for v in cluster_id_to_feature_ids.values()]
+
+            return self
+
+    def transform(self, X, y=None):
+        #print(self.selected_features)
+        # Perform transformation
+        return X[:, self.selected_features]
+
+
+
+
 # TODO add to repo or remove
 # import conversion_utils_mw_with_reporting_function as cu
 
 # TODO: clean up / maybe remove  this is the old code
 def convert_and_extract(dcm, mask):
 ##define directories
+
+
+
     idx = mask
     print(idx)
 

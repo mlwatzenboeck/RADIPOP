@@ -33,7 +33,8 @@ dependencies = [
     "pyradiomics",
     "numba",
     "scipy",
-    "scikit-learn"
+    "scikit-learn",
+    "scikit-optimize"
 ]
 
 [project.scripts]

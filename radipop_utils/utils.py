@@ -18,6 +18,8 @@ import dicom2nifti
 from glob import glob
 import tempfile
 import shutil
+import re 
+from collections import defaultdict
 
 
 
@@ -79,3 +81,49 @@ def dcm2nii(dicom_folder: Path, output_folder: Path, verbose: bool = True, out_i
             print(f"Converted id: {id}  from {dicom_folder}  to {output_folder_new}")
 
 
+def get_files_dict_by_regex_pattern(base_path, regex_pattern, strict=True):
+    """
+    Retrieve filenames matching a regex pattern within patient subdirectories.
+
+    Parameters
+    ----------
+    base_path : Path
+        The base directory containing patient subdirectories.
+    regex_pattern : str
+        The regular expression pattern to match the filenames.
+    strict : bool, optional
+        If True, assert that each patient subdirectory contains exactly one file matching the pattern (default is True).
+
+    Returns
+    -------
+    dict
+        A dictionary where keys are patient subdirectory names and values are lists of matched filenames.
+    """
+    # Compile the regular expression pattern for matching files
+    pattern = re.compile(regex_pattern)
+    
+    # Initialize a dictionary to hold the results
+    results = defaultdict(list)
+    
+    # Iterate over each subdirectory in the base path
+    for subdir in base_path.iterdir():
+        if subdir.is_dir():
+            # Get the name of the subdirectory (e.g., patient0001)
+            patient_name = subdir.name
+            
+            # Find all files in the subdirectory that match the regex pattern
+            matched_files = [f for f in subdir.iterdir() if f.is_file() and pattern.match(f.name)]
+            
+            if strict:
+                assert len(matched_files) == 1, (
+                    f"Expected exactly one file matching the pattern in {subdir}, but found {len(matched_files)}." + 
+                    "\n Files in dir:" +  "\n".join([file.name for file in subdir.iterdir() if file.is_file()])
+                    )
+                
+            if strict:
+                # Add the matched files to the results dictionary
+                results[patient_name] = matched_files[0]
+            else:
+                results[patient_name] = matched_files
+    
+    return dict(results)
