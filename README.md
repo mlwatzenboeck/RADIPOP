@@ -1,67 +1,34 @@
-# RADIPOP  -- CT Radiomics for Portal Hypertension
+# RADIPOP   CT Radiomics for Portal Hypertension
 
 This repository accompanies the manuscript 
 
 > Radiomics-based assessment of portal hypertension severity and risk stratification of cirrhotic patients using routine CT scans 
 >
-> Celine Sin1,2,3, Martin L. Watzenboeck4,5, Eugenia Iofinova1,6, Lorenz Balcar5,7,8, Georg Semmler5,7, Bernhard Scheiner5,7, Katharina Lampichler4,5,7, Mattias Mandorfer5,7, Lucile Moga9,10, Pierre-Emmanuel Rautou9,10, Maxime Ronot10,11, Jörg Menche1,2,3, Thomas Reiberger1,5,7,8‡, Martina Scharitzer1,4,5 ‡
-> 
->  CS and MLW share first authorship position
->‡ TR and MS share last authorship position 
-
->1 CeMM Research Center for Molecular Medicine of the Austrian Academy of Sciences, Vienna, Austria
->2 Max Perutz Labs, Vienna Biocenter Campus (VBC), Vienna, Austria
->3 University of Vienna, Center for Molecular Biology, Department of Structural and Computational Biology, Vienna, Austria
->4 Department of Biomedical Imaging and Image-Guided Therapy, Medical University of Vienna, Vienna, Austria
->5 Clinical Research Group MOTION, Medical University of Vienna, Vienna, Austria
->6 Institute of Science and Technology Austria, Vienna, Austria 
->7 Vienna Hepatic Hemodynamic Laboratory, Division of Gastroenterology and Hepatology, Department of Medicine III, Medical University of Vienna, Vienna, Austria
->8 Christian Doppler Laboratory for Portal Hypertension and Liver Fibrosis, Medical University of Vienna, Vienna, Austria
->9 AP-HP, Hôpital Beaujon, Service d'Hépatologie, DMU DIGEST, Centre de Référence des Maladies Vasculaires du Foie, FILFOIE, ERN RARE-LIVER, Clichy, France
->10 Université Paris-Cité, Inserm, Centre de recherche sur l'inflammation, UMR 1149, Paris, France
->11  Service de radiologie, Hôpital Beaujon, APHP Nord, Clichy & Université Paris Cité, CRI UMR 1149, Paris, France
-
-
-It contains scripts and tools used in the study for radiomics analysis, including image processing, feature extraction, feature selection, and model training.
-
-For additional scripts related to this study can be found [https://github.com/menchelab/radipop_scripts](https://github.com/menchelab/radipop_scripts). 
-
-Our custom segmentation software can be provided on request. For more information, visit Radipop Scripts and RADIPOP.
-
-
-# RADIPOP -- CT Radiomics for Portal Hypertension
-
-This repository supports the manuscript:
-
-**Radiomics-based assessment of portal hypertension severity and risk stratification of cirrhotic patients using routine CT scans**
-
-**Authors:**
-Celine Sin¹²³, Martin L. Watzenboeck⁴⁵, Eugenia Iofinova¹⁶, Lorenz Balcar⁵⁷⁸, Georg Semmler⁵⁷, Bernhard Scheiner⁵⁷, Katharina Lampichler⁴⁵⁷, Mattias Mandorfer⁵⁷, Lucile Moga⁹¹⁰, Pierre-Emmanuel Rautou⁹¹⁰, Maxime Ronot¹⁰¹¹, Jörg Menche¹²³, Thomas Reiberger¹⁵⁷⁸, Martina Scharitzer¹⁴⁵
-
-¹ CeMM Research Center for Molecular Medicine, Vienna, Austria  
-² Max Perutz Labs, Vienna Biocenter Campus, Vienna, Austria  
-³ University of Vienna, Center for Molecular Biology, Vienna, Austria  
-⁴ Department of Biomedical Imaging and Image-Guided Therapy, Medical University of Vienna, Vienna, Austria  
-⁵ Clinical Research Group MOTION, Medical University of Vienna, Vienna, Austria  
-⁶ Institute of Science and Technology Austria, Vienna, Austria  
-⁷ Vienna Hepatic Hemodynamic Laboratory, Medical University of Vienna, Vienna, Austria  
-⁸ Christian Doppler Laboratory for Portal Hypertension and Liver Fibrosis, Medical University of Vienna, Vienna, Austria  
-⁹ AP-HP, Hôpital Beaujon, Clichy, France  
-¹⁰ Université Paris-Cité, Inserm, Paris, France  
-¹¹ Service de radiologie, Hôpital Beaujon, Paris, France
+> Celine Sin, Martin L. Watzenboeck, Eugenia Iofinova, Lorenz Balcar, Georg Semmler, Bernhard Scheiner, Katharina Lampichler, Mattias Mandorfer, Lucile Moga, Pierre-Emmanuel Rautou, Maxime Ronot, Jörg Menche, Thomas Reiberger, Martina Scharitzer
 
 This repository contains scripts and tools for radiomics analysis used in the study, including image processing, feature extraction, feature selection, and model training.
 
-Additional related scripts are available at [Radipop Scripts](https://github.com/menchelab/radipop_scripts).
+Additional related scripts for the feature extraction of the training cohort are available at [https://github.com/menchelab/radipop_scripts](https://github.com/menchelab/radipop_scripts).
 
-Our custom segmentation software can be provided upon request. For more information, visit Radipop Scripts and RADIPOP.
+Our custom segmentation software can be provided upon request.
+
+### Main components
+
+Most important scripts with which the analysis of this manuscript are
+- [`RADIPOP_extract_features_external_validation.ipynb`](notebooks/RADIPOP_extract_features_external_validation.ipynb)
+  This script was used to extract the features for the external validation cohort with the same pipeline as used for the [training cohort](https://github.com/menchelab/radipop_scripts)
+
+- [`RADIPOP_model_training.ipynb`](notebooks/RADIPOP_model_training.ipynb)
+  TODO add description
+- [`RADIPOP_analysis.Rmd`](R/RADIPOP_analysis.Rmd) some data analysis and plots done with *R*
+
+<!-- Moreover, we provide a pipeline and a brief tutorial how to make a similar analysis with your own data.  -->
 
 ## Install instructions: 
 
 
-The python packages come with an appropriate `pyproject.toml` file, which specifies the dependencies. 
-This allows you to install them simply with
-
+Most of the code is in our python package `radipop_utils` which comes with an appropriate `pyproject.toml` file, which specifies the dependencies. 
+This allows you to install it simply with 
 ```
 pip install -e .
 ```
@@ -96,8 +63,7 @@ _________________
 Just some notes so that I don't forget. 
 
 ### Ongoing
-- [ ] Add `.yaml` files for the `pyradiomics` settigs and describe in more detail
-  - [x] Added [exampleCT.yaml](yaml/exampleCT.yaml), but needs to be checked
+- [x] Add `.yaml` files for the `pyradiomics` settigs and describe in more detail
 - [ ] Freeze environment and add as [requirements.txt](requirements.txt)
 - [ ] Create pipeline
   - [x] Feature extraction as a tool:
@@ -165,7 +131,8 @@ Example:
 radipop_extract_features --patientid patient0001 \
  --image /home/cwatzenboeck/data/cirdata/nnUNet_raw/Dataset125_LSS/imagesAll/patient0001_0000.nii.gz \
  --masks /home/cwatzenboeck/data/cirdata/nnUNet_raw/Dataset125_LSS/labelsAll/patient0001.nii.gz \
- --output_dir /home/cwatzenboeck/data/cirdata/radiomics/Dataset125_LSS/radipop 
+ --output_dir /home/cwatzenboeck/data/cirdata/radiomics/Dataset125_LSS/radipop \
+ --fe_settings /home/cwatzenboeck/code/RADIPOP/yaml/exampleCT.yaml 
 ```
 
 
