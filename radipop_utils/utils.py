@@ -140,7 +140,9 @@ def suggest_radiomics_binwidth(img: SimpleITK.SimpleITK.Image,
                                    "resampledPixelSpacing": [1, 1, 1],  # use None for no resampling
                                    "interpolator": sitk.sitkBSpline, 
                                    "padDistance": 10,
-                               }):
+                               }, 
+                               verbose = False, 
+                               return_range_instead=False):
     """Run extraction with only the first-order feature: Range to suggest a decent binwidth
     
     Make sure to provide the other settings according consistent with your yaml file
@@ -156,7 +158,6 @@ def suggest_radiomics_binwidth(img: SimpleITK.SimpleITK.Image,
     # Only enable Range in firstorder
     extractor.enableFeaturesByName(firstorder=['Range'])
 
-    print("Calculating features")
     extracted_features = extractor.execute(img, mask)
 
     features = {}
@@ -167,9 +168,11 @@ def suggest_radiomics_binwidth(img: SimpleITK.SimpleITK.Image,
     # display(features)
 
     r = features.loc[0, "original_firstorder_Range"]
+    if return_range_instead: 
+        return r    
     ratio = r / settings['binWidth']   # should be ~16-128 bins
 
-    print(f"Range / binWidth =  {ratio}  (should be 16-128)")
-    
-    print(f"Suggestion:  Use a binwith of ~ ", r / ((128 + 16)*0.5))
+    if verbose: 
+        print(f"Range / binWidth =  {ratio}  (should be 16-128)")
+        print(f"Suggestion:  Use a binwith of ~ ", r / ((128 + 16)*0.5))
     return r / ((128 + 16)*0.5)

@@ -114,11 +114,25 @@ def extract_and_save_features_from_nii(patientid: str, image_loc: Union[Path, st
         )
     """
     
+    output_dir = Path(output_dir)
+    os.makedirs(output_dir / patientid, exist_ok=True)
+    
+    # skip before loading the image
+    if check_existence: 
+        can_be_skipped = True
+        for tissue_type in tissue_class_dct.keys():
+            out_file = output_dir / patientid / f"Features_{tissue_type}.xlsx"
+            if not os.path.isfile(out_file): 
+                can_be_skipped = False
+                break
+        if can_be_skipped:
+            if verbose:
+                print(f"All Radiomics features already exists in {output_dir / patientid}. Skipped!")
+            return None
+    
     mask = sitk.ReadImage(mask_loc)
     img = sitk.ReadImage(image_loc)
     
-    output_dir = Path(output_dir)
-    os.makedirs(output_dir / patientid, exist_ok=True)
     
     for tissue_type in tissue_class_dct.keys():
         out_file = output_dir / patientid / f"Features_{tissue_type}.xlsx"

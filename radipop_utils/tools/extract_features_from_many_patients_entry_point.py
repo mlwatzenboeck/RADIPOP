@@ -1,5 +1,6 @@
 import os
 import argparse
+import shutil
 from pathlib import Path
 import pandas as pd
 from tqdm import tqdm
@@ -62,6 +63,13 @@ def main_function():
     print(args)
     
     extraction_loop(args.images_and_mask_paths_file, args.output_dir, args.fe_settings)
+    
+    # copy fe_settings file to output_dir
+    try:
+        shutil.copy(args.fe_settings, args.output_dir)
+        print(f"Settings file {args.fe_settings} copied to {args.output_dir}")
+    except Exception as e:
+        print(f"An error occurred while copying the settings file: {e}")
 
 
 if __name__ == "__main__":

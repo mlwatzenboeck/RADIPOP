@@ -9,12 +9,13 @@ authors = [
     { name = "Department of Radiology; Medical University of Vienna" }
 ]
 classifiers = [
-    "Development Status :: 3 - Alpha",
+    "Development Status :: 4 - Beta",
     "Intended Audience :: Science/Research",
     "Intended Audience :: Healthcare Industry",
     "Programming Language :: Python :: 3",
     "Topic :: Scientific/Engineering :: Image Recognition",
     "Topic :: Scientific/Engineering :: Medical Science Apps.",
+    "Topic :: Scientific/Engineering :: Radiomics",
 ]
 keywords = [
     'medical image analysis',
@@ -39,9 +40,9 @@ dependencies = [
 ]
 
 [project.scripts]
-radipop_predict = "radipop_utils.example_module:main_function"
 radipop_extract_features = "radipop_utils.tools.extract_features_entry_point:main_function"
 radipop_extract_features_many_times = "radipop_utils.tools.extract_features_from_many_patients_entry_point:main_function"
+radipop_suggest_binwidth = "radipop_utils.tools.suggest_radiomics_binwidth_entry_point:main_function"
 
 [project.optional-dependencies]
 dev = [
