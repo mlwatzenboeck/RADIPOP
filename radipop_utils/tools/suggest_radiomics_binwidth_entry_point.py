@@ -88,14 +88,22 @@ def main_function():
 
     ranges, shapes = get_reasonable_binwith(df, frac=args.frac, fe_setting=settings["setting"], verbose=True)
 
-    print(f"{ranges =}")
     print(f"{shapes =}", "\n")
-
     # range / binwidth shoudl be 16 - 128:
-    # -> 
-    suggested_binwidth = np.mean(ranges) / ((16 + 128) / 2)
+    
+    ranges = np.sort(ranges)
+    print(f"sorted {ranges =}")
+    
+    
+    suggestion1 = ranges[0] / 16.0
+    suggestion2 = ranges[-1] / 128
+    suggestion3 = ranges.mean() / ((128 + 16)/2)
+    suggestion4 = np.median(ranges) / ((128 + 16)/2)
+    
+    
+    suggested_binwidth = suggestion1
     print(f"{suggested_binwidth = } for the settings in {args.fe_settings}.")
-
+    print("This leads to range / binwidth = ", ranges / suggested_binwidth)
     # we cant make everyone happy, but lets try: 
     print(f"With this bin width the ratio: range/binwidth is < 16 for {sum(ranges / suggested_binwidth < 16)}/{int(len(df) * args.frac)}  and > 128 for {sum(ranges / suggested_binwidth > 128)}/{int(len(df) * args.frac)}.")
 

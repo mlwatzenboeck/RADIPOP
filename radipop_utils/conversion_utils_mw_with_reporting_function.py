@@ -11,6 +11,7 @@ import pydicom
 import sys
 import pickle
 import imageio as io
+import matplotlib.pyplot as plt
 
 #######note 20.9.2020
 #since there are some errors with some images, try to implement conditional statement to reduce those

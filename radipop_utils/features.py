@@ -5,6 +5,8 @@ import time
 from pathlib import Path
 from collections import defaultdict
 from typing import List, Union, Dict
+from typing import Tuple, List
+
 
 import numpy as np
 import pandas as pd
@@ -44,6 +46,87 @@ path = Path(os.path.abspath(radipop_utils.__file__))
 RADIPOP_PACKAGE_ROOT = path.parent.parent
 
 
+
+import numpy as np
+import SimpleITK as sitk
+import nibabel as nib
+
+
+# def win_scale(data, wl, ww, dtype, out_range):   # old version with a bug
+#     """
+#     Scale pixel intensity data using specified window level, width, and intensity range.
+#     """
+#     data_new = np.empty(data.shape, dtype=np.double)
+#     #data_new.fill(out_range[1]-1)
+#     data_new.fill(out_range[1])
+
+#     data_new[data <= (wl - ww / 2.0)] = out_range[0]
+#     mask = (data > (wl - ww / 2.0)) & (data <= (wl + ww / 2.0))
+#     data_new[mask] = ((data[mask] - (wl - 0.5)) / (ww - 1.0) +
+#                       0.5) * (out_range[1] - out_range[0]) + out_range[0]
+#     data_new[data > (wl + ww / 2.0)] = out_range[1] - 1
+
+#     return data_new.astype(dtype)
+
+
+def win_scale(X: np.array, wl: float, ww: float , dtype, out_range: List[float]):
+    """
+    Scale pixel intensity data using specified window level, width, and intensity range.
+    """
+    # wl:  window_position_middle 
+    # ww:  window_width
+    
+    wl_new = (out_range[0] + out_range[1]) * 0.5
+    ww_new = (out_range[0] - out_range[1])
+    
+    out_lower = wl - ww / 2.0
+    out_upper = wl + ww / 2.0
+    mask_out_lower = X < out_lower
+    mask_out_upper = X > out_upper
+#    mask_in = (~mask_out_lower) & (~mask_out_upper)
+    assert len(out_range) == 2
+    
+    Xn = np.copy(X).astype(np.double)
+    Xn = (X - wl) / ww   # roi in  [-0.5,  + 0.5]
+    Xn = Xn*ww_new + wl_new        # roi in  [out_range[0] , out_range[1]]
+    
+    Xn[mask_out_lower] = out_range[0]
+    Xn[mask_out_upper] = out_range[1]
+    
+    return Xn.astype(dtype)
+
+
+
+def extract_pixels_for_viewing_from_nii(nifti_image, rescale_slope, rescale_intercept, out_range=[0, 255], wl=60, ww=400, dtype=np.uint8):
+    hu = nifti_image * rescale_slope + rescale_intercept
+    return win_scale(hu, wl, ww, dtype, out_range)
+
+
+def convert_and_extract_from_nii(nii_path, out_range=[0, 255], wl=60, ww=400, dtype=np.uint8):
+
+    # Load the NIfTI file using nibabel to get some metadata if available
+    nifti = nib.load(nii_path)
+    rescale_slope, rescale_intercept = nifti.header.get_slope_inter()
+    if rescale_slope == None:
+        rescale_slope = 1.0
+    if rescale_intercept == None:
+        rescale_intercept = 0.0
+
+    nifti_array = sitk.GetArrayFromImage(sitk.ReadImage(nii_path))
+    # Perform the windowing transformation on all slices
+    transformed_slices = np.array([extract_pixels_for_viewing_from_nii(slice, rescale_slope, rescale_intercept, 
+                                                                       out_range=out_range, wl=wl, ww=ww, dtype=dtype)
+                                   for slice in nifti_array])
+    print(transformed_slices.shape)
+
+    # Convert the transformed slices back to a SimpleITK Image
+    transformed_img = sitk.GetImageFromArray(transformed_slices)
+
+    # Copy metadata from the original NIfTI image
+    original_img = sitk.ReadImage(nii_path)
+    transformed_img.CopyInformation(original_img)
+
+    return transformed_img
 
 
 def extract_radiomics_features(image: SimpleITK.SimpleITK.Image,
