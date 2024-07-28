@@ -30,7 +30,8 @@ def get_reasonable_binwith(df_file_names: pd.DataFrame,
                                "resampledPixelSpacing": [2.0, 0.71875, 0.71875],
                                "interpolator": sitk.sitkBSpline,
                                "padDistance": 10,
-                           },):
+                           },
+                           windowing_dct : Union[None, dict] = None):
     res = []
     shapes = []
     tissue_class_dct = {"liver": 1, "spleen": 2}
@@ -40,7 +41,16 @@ def get_reasonable_binwith(df_file_names: pd.DataFrame,
         mask_loc = df.loc[idx, "masks"]
 
         mask = sitk.ReadImage(mask_loc)
-        img = sitk.ReadImage(image_loc)
+        if windowing_dct == None: 
+            img = sitk.ReadImage(image_loc)
+        else:
+            # windowing_dct = dict(out_range = [0,255], 
+            #                      wl = 60, 
+            #                      ww = 600, 
+            #                      dtype = np.uint8)
+            # TODO 
+            img_transformed = radipop_utils.features.convert_and_extract_from_nii(image_loc, **windowing_dct)      
+        
         s = sitk.GetArrayFromImage(img).shape
         if verbose:
             print(f"shape = ", s)
@@ -86,7 +96,15 @@ def main_function():
         
     df = pd.read_excel(args.images_and_mask_paths_file)
 
-    ranges, shapes = get_reasonable_binwith(df, frac=args.frac, fe_setting=settings["setting"], verbose=True)
+    windowing_dct = dict(out_range = [0,255], 
+                         wl = 60, 
+                         ww = 600, 
+                         dtype = np.float64)
+    # windowing_dct = dict(out_range = [0,255], 
+    #                      wl = 60, 
+    #                      ww = 600, 
+    #                      dtype = np.uint8)
+    ranges, shapes = get_reasonable_binwith(df, frac=args.frac, fe_setting=settings["setting"], verbose=True, windowing_dct=windowing_dct) 
 
     print(f"{shapes =}", "\n")
     # range / binwidth shoudl be 16 - 128:
