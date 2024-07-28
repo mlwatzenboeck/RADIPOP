@@ -1,0 +1,69 @@
+[project]
+name = "radipop_utils"
+version = "0.1"
+requires-python = ">=3.7"
+description = "The radipop_utils package contains useful functions for extracting most important radiomics features from CT images used for HVPG prediction as well as time-to-event prediction (outcome)."
+readme = "README.md"
+authors = [
+    { name = "Martin Luther Watzenböck", email = "martin.watzenboeck@meduniwien.ac.at"},
+    { name = "Department of Radiology; Medical University of Vienna" }
+]
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "Intended Audience :: Science/Research",
+    "Intended Audience :: Healthcare Industry",
+    "Programming Language :: Python :: 3",
+    "Topic :: Scientific/Engineering :: Image Recognition",
+    "Topic :: Scientific/Engineering :: Medical Science Apps.",
+    "Topic :: Scientific/Engineering :: Radiomics",
+]
+keywords = [
+    'medical image analysis',
+    'radiomics',
+]
+dependencies = [
+    "numpy",
+    "pandas",
+    "seaborn",
+    "matplotlib",
+    "pydicom",
+    "nibabel",
+    "dicom2nifti",
+    "simpleitk",
+    "pillow",
+    "pyradiomics",
+    "numba",
+    "scipy",
+    "scikit-learn",
+    "scikit-optimize", 
+    "scikit-image"
+]
+
+[project.scripts]
+radipop_extract_features = "radipop_utils.tools.extract_features_entry_point:main_function"
+radipop_extract_features_many_times = "radipop_utils.tools.extract_features_from_many_patients_entry_point:main_function"
+radipop_suggest_binwidth = "radipop_utils.tools.suggest_radiomics_binwidth_entry_point:main_function"
+
+[project.optional-dependencies]
+dev = [
+    "black",
+    "ruff",
+    "pre-commit"
+]
+
+[build-system]
+requires = ["setuptools>=67.8.0", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[tool.codespell]
+skip = '.git,*.pdf,*.svg'
+#
+# ignore-words-list = ''
+
+[tool.setuptools.packages.find]
+where = ["."]
+#where = ["radipop_utils"]
+
+[project.urls]
+homepage = "https://github.com/mlwatzenboeck/RADIPOP"
+
