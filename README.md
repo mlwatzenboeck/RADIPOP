@@ -21,7 +21,7 @@ Our custom segmentation software can be provided upon request.
 
 ### Main content
 
-Most important scripts with which the analysis of this manuscript are
+The most important scripts with which the analysis steps in the manuscript above can be recreated:
 - [`RADIPOP_extract_features_external_validation.ipynb`](notebooks/RADIPOP_extract_features_external_validation.ipynb)
   This Jupyter notebook was used for preprocessing and feature extraction of the external validation cohort with the same methodology as used for the [training cohort](https://github.com/menchelab/radipop_scripts)
 
