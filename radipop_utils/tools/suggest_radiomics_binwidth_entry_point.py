@@ -44,12 +44,7 @@ def get_reasonable_binwith(df_file_names: pd.DataFrame,
         if windowing_dct == None: 
             img = sitk.ReadImage(image_loc)
         else:
-            # windowing_dct = dict(out_range = [0,255], 
-            #                      wl = 60, 
-            #                      ww = 600, 
-            #                      dtype = np.uint8)
-            # TODO 
-            img_transformed = radipop_utils.features.convert_and_extract_from_nii(image_loc, **windowing_dct)      
+            img = radipop_utils.features.convert_and_extract_from_nii(image_loc, **windowing_dct)      
         
         s = sitk.GetArrayFromImage(img).shape
         if verbose:
@@ -81,6 +76,8 @@ def main_function():
     parser.add_argument("--frac", type=float, 
                     default=1.0,
                     help="Use only a random fraction of the images for estimating the binwidth.")
+
+
     
     args = parser.parse_args()
     
@@ -96,7 +93,7 @@ def main_function():
         
     df = pd.read_excel(args.images_and_mask_paths_file)
 
-    windowing_dct = dict(out_range = [0,255], 
+    windowing_dct = dict(out_range = [0.0, 1.0], 
                          wl = 60, 
                          ww = 600, 
                          dtype = np.float64)
