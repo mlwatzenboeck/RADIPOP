@@ -15,7 +15,8 @@ RADIPOP_PACKAGE_ROOT = path.parent.parent
 # Load environment variables as dictionary
 config = dotenv_values(find_dotenv())
 
-def extraction_loop(images_and_mask_paths_file: Union[Path, str], output_dir: Union[Path, str], fe_settings: Union[Path, str]):
+def extraction_loop(images_and_mask_paths_file: Union[Path, str], output_dir: Union[Path, str], fe_settings: Union[Path, str],
+                    window_location_middle=50, window_width=500):
     df = pd.read_excel(images_and_mask_paths_file)
     assert "images" in df.columns
     assert "masks" in df.columns
@@ -37,7 +38,9 @@ def extraction_loop(images_and_mask_paths_file: Union[Path, str], output_dir: Un
                                                                   fe_settings_path=fe_settings,
                                                                   tissue_class_dct=tissue_class_dct,
                                                                   check_existence=True,
-                                                                  verbose=True)
+                                                                  verbose=True,
+                                                                  window_location_middle=window_location_middle, 
+                                                                  window_width = window_width)
 
     print("Done with feature extraction!")
 
@@ -59,10 +62,20 @@ def main_function():
                         default=RADIPOP_PACKAGE_ROOT / "yaml" / "exampleCT.yaml",
                         help="Path to the radiomics feature extraction settings file.")
     
+    parser.add_argument("--window_location_middle", type=float, 
+                    default=50,
+                    help="Position (middpoint) of the intesity window. (Default = 50 HU -> soft tissue CT window.)")
+    
+    parser.add_argument("--window_width", type=float, 
+                    default=500,
+                    help="Width of the intesity window. (Default = 500 HU -> soft tissue CT window.)")    
+    
     args = parser.parse_args()
     print(args)
     
-    extraction_loop(args.images_and_mask_paths_file, args.output_dir, args.fe_settings)
+    extraction_loop(args.images_and_mask_paths_file, args.output_dir, args.fe_settings, 
+                    window_location_middle=args.window_location_middle, 
+                    window_width = args.window_width)
     
     # copy fe_settings file to output_dir
     try:

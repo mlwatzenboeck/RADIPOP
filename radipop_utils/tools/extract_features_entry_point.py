@@ -30,6 +30,14 @@ def main_function():
                         default=RADIPOP_PACKAGE_ROOT / "yaml" / "exampleCT.yaml",
                         help="Path to the radiomics feature extraction settings file.")
     
+    parser.add_argument("--window_location_middle", type=float, 
+                    default=50,
+                    help="Position (middpoint) of the intesity window. (Default = 50 HU -> soft tissue CT window.)")
+    
+    parser.add_argument("--window_width", type=float, 
+                    default=500,
+                    help="Width of the intesity window. (Default = 500 HU -> soft tissue CT window.)")
+    
     args = parser.parse_args()
     print(args)
     
@@ -42,7 +50,9 @@ def main_function():
                                                                 fe_settings_path=args.fe_settings,
                                                                 tissue_class_dct=tissue_class_dct,
                                                                 check_existence=True,
-                                                                verbose=True)
+                                                                verbose=True,
+                                                                window_location_middle=args.window_location_middle, 
+                                                                window_width = args.window_width)
     print("Done with feature extraction!")
 
 

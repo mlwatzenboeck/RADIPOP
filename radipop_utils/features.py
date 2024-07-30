@@ -52,29 +52,36 @@ import SimpleITK as sitk
 import nibabel as nib
 
 
-# def win_scale(data, wl, ww, dtype, out_range):   # old version with a bug
-#     """
-#     Scale pixel intensity data using specified window level, width, and intensity range.
-#     """
-#     data_new = np.empty(data.shape, dtype=np.double)
-#     #data_new.fill(out_range[1]-1)
-#     data_new.fill(out_range[1])
-
-#     data_new[data <= (wl - ww / 2.0)] = out_range[0]
-#     mask = (data > (wl - ww / 2.0)) & (data <= (wl + ww / 2.0))
-#     data_new[mask] = ((data[mask] - (wl - 0.5)) / (ww - 1.0) +
-#                       0.5) * (out_range[1] - out_range[0]) + out_range[0]
-#     data_new[data > (wl + ww / 2.0)] = out_range[1] - 1
-
-#     return data_new.astype(dtype)
-
 
 def win_scale(X: np.array, wl: float, ww: float , dtype, out_range: List[float]):
     """
-    Scale pixel intensity data using specified window level, width, and intensity range.
+    Scales pixel intensity data using a specified window level, window width, and intensity range.
+
+    Parameters:
+    X (np.array): Input array of pixel intensity data.
+    wl (float): Window level, representing the midpoint of the intensity range.
+    ww (float): Window width, defining the range of intensities to be displayed.
+    dtype: Data type to which the output array should be cast.
+    out_range (List[float]): Output intensity range as [lower_bound, upper_bound].
+
+    Returns:
+    np.array: Scaled array of pixel intensities with values adjusted according to the specified
+              window level, width, and output range, and cast to the specified data type.
+
+    Notes:
+    - The function adjusts the pixel intensities in the input array `X` to fit within the
+      specified window level (`wl`) and window width (`ww`).
+    - Intensities outside the range defined by `wl` and `ww` are clipped to the bounds of
+      the specified output range (`out_range`).
+    - The output array is cast to the specified data type (`dtype`).
+
+    Example:
+    >>> import numpy as np
+    >>> X = np.array([0, 50, 100, 150, 200, 250])
+    >>> out_range = [0.0, 1.0]
+    >>> win_scale(X, wl=100, ww=100, dtype = np.float32, out_range = [0.0, 1.0])
+    array([0. , 0. , 0.5, 1. , 1. , 1. ], dtype=float32)
     """
-    # wl:  window_position_middle 
-    # ww:  window_width
     
     wl_new = (out_range[0] + out_range[1]) * 0.5
     ww_new = (out_range[0] - out_range[1])
@@ -170,7 +177,9 @@ def extract_and_save_features_from_nii(patientid: str, image_loc: Union[Path, st
                                        fe_settings_path: Union[str, Path], 
                                        tissue_class_dct : Dict[str, int] = {"liver": 1, "spleen": 2},
                                        check_existence=True,
-                                       verbose = True) -> None:
+                                       verbose = True,
+                                       window_location_middle : Union[float, None] = 50, 
+                                       window_width : Union[float, None] = 500) -> None:
     """
     Extracts radiomics features from NIfTI images and saves them to specified output directory.
 
@@ -183,6 +192,8 @@ def extract_and_save_features_from_nii(patientid: str, image_loc: Union[Path, st
         tissue_class_dct (Dict[str, int], optional): Dictionary mapping tissue types to their corresponding mask values. Default is {"liver": 1, "spleen": 2}.
         check_existence (bool, optional): If True, checks if the features file already exists and skips extraction if it does. Default is True.
         verbose (bool, optional): If True, prints progress messages. Default is True.
+        window_location_middle (Union[float, None], optional): Intensity window position (Default = 50 HU); if None -> No windowing 
+        window_width (Union[float, None], optional): Intensity window width (Default = 500 HU); if None -> No windowing 
 
     Returns:
         None
@@ -216,7 +227,16 @@ def extract_and_save_features_from_nii(patientid: str, image_loc: Union[Path, st
     mask = sitk.ReadImage(mask_loc)
     img = sitk.ReadImage(image_loc)
     
-    
+    if window_location_middle==None or window_width==None:
+        print(f"Intensity windowing is not used because {window_location_middle =} {window_width=}.")
+        img = sitk.ReadImage(image_loc)
+    else:
+        windowing_dct = dict(out_range = [0.0, 1.0], 
+                        wl = window_location_middle, 
+                        ww = window_width, 
+                        dtype = np.float64)
+        img = radipop_utils.features.convert_and_extract_from_nii(image_loc, **windowing_dct)      
+        
     for tissue_type in tissue_class_dct.keys():
         out_file = output_dir / patientid / f"Features_{tissue_type}.xlsx"
         if check_existence and os.path.isfile(out_file): 
