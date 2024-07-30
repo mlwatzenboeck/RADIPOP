@@ -1,7 +1,7 @@
 [project]
 name = "radipop_utils"
 version = "0.1"
-requires-python = ">=3.9"
+requires-python = ">=3.7"
 description = "The radipop_utils package contains useful functions for extracting most important radiomics features from CT images used for HVPG prediction as well as time-to-event prediction (outcome)."
 readme = "README.md"
 authors = [
