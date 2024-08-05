@@ -4,36 +4,20 @@ import yaml
 import pandas as pd
 import numpy as np
 import pickle
-from typing import Literal, Union
-from glob import glob
-import matplotlib.pyplot as plt
-import pprint
+from pprint import pprint
 import argparse
 
-from sklearn.model_selection import KFold
-from sklearn.ensemble import RandomForestClassifier, RandomForestRegressor
-from sklearn.metrics import roc_auc_score, roc_curve, r2_score, RocCurveDisplay
+from sklearn.ensemble import RandomForestRegressor
 # see https://stackoverflow.com/questions/60321389/sklearn-importerror-cannot-import-name-plot-roc-curve
-from sklearn.feature_selection import SelectFromModel
 from sklearn.pipeline import Pipeline
-from sklearn.svm import LinearSVC
-from sklearn.model_selection import GridSearchCV, RandomizedSearchCV
 from sklearn.linear_model import ElasticNet
-from sklearn.preprocessing import StandardScaler
-from sklearn.base import BaseEstimator, TransformerMixin
-from scipy.cluster import hierarchy
-from scipy.spatial.distance import squareform
-from scipy.stats import spearmanr, pearsonr
-from scipy.stats import ttest_ind
 import skopt
-from sklearn.metrics import mean_squared_error, mean_absolute_error
 
 import radipop_utils
 import radipop_utils.visualization
 import radipop_utils.features
 from radipop_utils.features import SpearmanReducerCont
 import radipop_utils.utils
-from radipop_utils.utils import get_files_dict_by_regex_pattern
 import radipop_utils.data
 
 
@@ -70,7 +54,7 @@ def main_function():
     args_dict = vars(args)
     print("Used arguments: ")
     print("---------------")
-    pprint.pprint(args_dict)
+    pprint(args_dict)
     print()
 
     DATA_ROOT_DIRECTORY = Path(args.data_root_directory)
