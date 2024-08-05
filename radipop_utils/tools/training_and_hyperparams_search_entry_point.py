@@ -46,7 +46,7 @@ def main_function():
     parser.add_argument('--radiomics_option', type=str, default="radipop_111",
                         help='Radiomics option. (default: %(default)s)')
     parser.add_argument('--num_searches', type=int, default=10,
-                        help='Number of hyperparameter searches. (default: %(default)s)')
+                        help='Number of hyperparameter searches (e.g. "r2" or "neg_root_mean_squared_error"). (default: %(default)s)')
     parser.add_argument('--search_scoring_metric', type=str, default="r2",
                         help='Scoring metric for hyperparameter search. (default: %(default)s)')
 

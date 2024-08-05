@@ -82,7 +82,7 @@ def load_and_combined_radiomics_features(df_paths: pd.DataFrame) -> pd.DataFrame
 def load_HVPG_values_and_radiomics(DATASET: str, RADIOMICS_OPTION: str, DATA_ROOT_DIRECTORY: Union[str, Path]):
     DATA_ROOT_DIRECTORY = Path(DATA_ROOT_DIRECTORY)
     paths_and_hvpg_data_file = DATA_ROOT_DIRECTORY / "tabular_data" / "paths_and_hvpg_values" / f"file_paths_and_hvpg_data_{DATASET}.xlsx"
-    radiomics_dir = DATA_ROOT_DIRECTORY / "radiomics" / "Dataset125_LSS" / RADIOMICS_OPTION
+    radiomics_dir = DATA_ROOT_DIRECTORY / "radiomics" / DATASET /  RADIOMICS_OPTION
 
     df = get_HVPG_values_and_radiomics_paths(hvpg_data_file=paths_and_hvpg_data_file, radiomics_dir=radiomics_dir)
 
