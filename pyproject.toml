@@ -43,6 +43,7 @@ dependencies = [
 radipop_extract_features = "radipop_utils.tools.extract_features_entry_point:main_function"
 radipop_extract_features_many_times = "radipop_utils.tools.extract_features_from_many_patients_entry_point:main_function"
 radipop_suggest_binwidth = "radipop_utils.tools.suggest_radiomics_binwidth_entry_point:main_function"
+radipop_training_and_hyperparams_search = "radipop_utils.tools.training_and_hyperparams_search_entry_point:main_function"
 
 [project.optional-dependencies]
 dev = [
