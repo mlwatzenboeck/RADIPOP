@@ -9,6 +9,7 @@ import radipop_utils.visualization
 import radipop_utils.features
 import radipop_utils.utils
 import radipop_utils.data
+import radipop_utils.inference
 
 
 # load user/ system specific env variables:
@@ -80,10 +81,13 @@ def main_function():
     
     
     #### export feature importances
-    dst = OUTDIR / "regression" / RADIOMICS_OPTION / "Feature_importances_RF_regressor.xlsx"
-    feature_impRF = radipop_utils.inference.get_feature_importancesRF(df_Tr, X_Tr, Y_Tr, modelRF, loaded_params)
-    feature_impRF.to_excel(dst)
-    print(f"Feature importances saved to {dst}")
+    # <CW:> There might still be a bug in there. It crashed for one radiomics option. 
+    # (Different lenght of feature names and feature importances, or similar)
+    #
+    # dst = OUTDIR / "regression" / RADIOMICS_OPTION / "Feature_importances_RF_regressor.xlsx"
+    # feature_impRF = radipop_utils.inference.get_feature_importancesRF(df_Tr, X_Tr, Y_Tr, modelRF, loaded_params)
+    # feature_impRF.to_excel(dst)
+    # print(f"Feature importances saved to {dst}")
     
     #### Evaluate on testsets
     # load the model trained on the whole training set
