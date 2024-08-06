@@ -120,3 +120,27 @@ def get_feature_importancesRF(df_Tr, X_Tr, Y_Tr, modelRF, loaded_params):
     })
     
     return feat_imp.sort_values("importance", ascending=False)
+
+
+def process_metric_files(experiments, metric_files):
+    metric_dataframes = {}
+    for exp_name, exp in experiments.items():
+        for metric_file in metric_files:
+            path = exp["path"] / metric_file
+            if path.exists():
+                df = pd.read_excel(path)
+                df.rename(columns={"Unnamed: 0": "model"}, inplace=True)  # Rename the unnamed column to 'model'
+                df["experiment"] = exp_name  # Add a new column with the exp_name
+                metric_dataframes.setdefault(metric_file, []).append(df)
+            else:
+                print(f"File {path} does not exist")
+        print("\n\n")
+
+    # Access the dataframes for each metric type
+    r = {}
+    for metric_file, dfs in metric_dataframes.items():
+        df_concat = pd.concat(dfs).reset_index(drop=True)
+        df_concat = df_concat[['experiment'] + [col for col in df_concat.columns if col != 'experiment']]
+        r[metric_file.split(".")[0]] = df_concat
+    
+    return r
