@@ -44,9 +44,12 @@ _________________
 After installing the `radipop_utils` utils package the following commands are available: 
 
 -  `radipop_suggest_binwidth`-- Estimate a reasonable BinWidth for the radiomics settings of your data
-- `radipop_extract_features`  -- Can be used to extract the radiomics feature from single CT images/ masks. 
+<!-- - `radipop_extract_features`  -- Can be used to extract the radiomics feature from single CT images/ masks.  -->
 - `radipop_extract_features_many_times` -- Can be used to extract the radiomics feature from  CT images.
-- `radipop_predict` -- TODO!!
+- `radipop_training_and_hyperparams_search` -- Get reasonable hyperparameters by running Bayesian optimization (on the training set!)
+- `radipop_evaluate_model` -- Run inference on internal testset (`iTs`) and external testset (`eTs`) and save metrics as well as raw inference. 
+
+In essence, you just need to run these command line functions in order. 
 
 __________________
 
@@ -62,14 +65,14 @@ We will give a brief description of the suggested workflow to achive this.
 
 ## Preliminaries: 
 
-
-
 The file with the path-names for the images and masks for `radipop_extract_features_many_times --images_and_mask_paths_file <this file>` as well as the training should look like this: 
 
 
 <img src="../fig/file_paths_and_hvpg_values.png" style="width: 55vw; min-width: 330px;">
 
-Note that this assumes that the training test-split, was well as the rotation (non-overlapping!) cross-validation sets were already defined beforehand. It might for instance make sense to perform a stratified-training test split, with a stratification on scanner-type, sex, health status (as we did) or something similar.
+Note that this assumes that the training test-split, was well as the rotation (non-overlapping!) cross-validation sets were already defined beforehand. It might for instance make sense to perform a stratified-training test split, with a stratification on scanner-type, sex, health status (as we did) or something similar. 
+
+*Yes, I know that there is an error in paths of the screenshot. This is just for illustration purposes. You need the correct paths for your images/masks anyhow.*
 
 
 
@@ -142,10 +145,54 @@ optional arguments:
 If you only want to extract the radiomics for a single patient you might want to take a look at `radipop_extract_features -h` instead. 
 
 
-### 3) Feature reduction, Training, Validation and Testing
 
-TODO Update and clean up. Basic version is in  [`CW_model_training.ipynb`](../notebooks/CW_model_training.ipynb)).
+### 3) Feature reduction, Training, Validation, and Testing
 
+To perform feature reduction, training, validation, and testing, you can use the `radipop_training_and_hyperparams_search` command. Here are the available options:
+
+```bash
+$ radipop_training_and_hyperparams_search -h
+usage: radipop_training_and_hyperparams_search [-h] [--data_root_directory DATA_ROOT_DIRECTORY] [--outdir OUTDIR] [--dataset DATASET]
+                         [--radiomics_option RADIOMICS_OPTION] [--num_searches NUM_SEARCHES]
+                         [--search_scoring_metric SEARCH_SCORING_METRIC]
+
+Training and Hyperparameter Search
+
+optional arguments:
+  -h, --help            show this help message and exit
+  --data_root_directory DATA_ROOT_DIRECTORY
+            Root directory of the data. (default: /home/cwatzenboeck/data/cirdata)
+  --outdir OUTDIR       Output directory. (default: /home/cwatzenboeck/data/cirdata/radiomics/Dataset125_LSS)
+  --dataset DATASET     Dataset name. (default: Dataset125_LSS)
+  --radiomics_option RADIOMICS_OPTION
+            Radiomics option. (default: radipop_111)
+  --num_searches NUM_SEARCHES
+            Number of hyperparameter searches (e.g. "r2" or "neg_root_mean_squared_error"). (default: 10)
+  --search_scoring_metric SEARCH_SCORING_METRIC
+            Scoring metric for hyperparameter search. (default: r2)
+```
+
+
+
+### 4) Model evaluation
+
+To evaluate your model on the training and test sets, you can use the `radipop_evaluate_model` command. Here are the available options:
+
+```bash
+$ radipop_evaluate_model -h
+usage: radipop_evaluate_model [-h] [--data_root_directory DATA_ROOT_DIRECTORY] [--outdir OUTDIR] [--dataset DATASET] [--radiomics_option RADIOMICS_OPTION]
+
+Evaluate model on training and test sets. For the training set, rotating CV is used (and the model is retrained).
+
+optional arguments:
+  -h, --help            show this help message and exit
+  --data_root_directory DATA_ROOT_DIRECTORY
+            Root directory of the data. (default: /home/cwatzenboeck/data/cirdata)
+  --outdir OUTDIR       Output directory. (default: /home/cwatzenboeck/data/cirdata/radiomics/Dataset125_LSS)
+  --dataset DATASET     Dataset name. (default: Dataset125_LSS)
+  --radiomics_option RADIOMICS_OPTION
+            Radiomics option. (default: radipop_111)
+```
 
 _________________
 
@@ -156,9 +203,11 @@ Just some notes so that I don't forget.
 - [ ] Freeze environment and add as [requirements.txt](requirements.txt)
 - [ ] Create pipeline
   - [x] Feature extraction as a tool. 
+  - [x] Hyperparameter search as a tool. 
+  - [x] Evaluation as a tool. 
   - [ ] Prediction as a tool (maybe publish trained model to huggingface, or similar)
 
 ### Completed Column ✓
 - [x] Refactor and change to package
-- [x] Add `.yaml` files for the `pyradiomics` settigs and describe in more detail
+- [x] Add `.yaml` files for the `pyradiomics` settigs and describe in more detail how to set `binWidth` ect. 
 
