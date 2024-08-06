@@ -107,6 +107,9 @@ def quantitation_metrics_RF_and_EN(y_true, y_pred_RF, y_pred_EN):
 
 
 def get_feature_importancesRF(df_Tr, X_Tr, Y_Tr, modelRF, loaded_params):
+    raise NotImplementedError("This function is not implemented yet.")
+    # dim(features[selector.selected_features])  != dim(modelRF.named_steps["regression"].feature_importances_)
+    # use permuation based feature importance instead  ... but is not super important for now
     selector = SpearmanReducerCont(loaded_params["RF"]['feature_selection__split_param'])
     selector.fit(X_Tr, Y_Tr)
 

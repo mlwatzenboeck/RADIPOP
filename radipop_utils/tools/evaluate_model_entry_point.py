@@ -94,6 +94,18 @@ def main_function():
     modelRF = loaded_models["RF"]
     modelEN = loaded_models["EN"]    
 
+
+    # evaluate on training set (no good performance measure, but useful checking against overfitting)
+    rf_res = modelRF.predict(X_Tr)
+    en_res = modelEN.predict(X_Tr)
+    res_Tr = pd.DataFrame({"True_HVPG" : Y_Tr, 
+                            "RF_HVPG" : rf_res,
+                            "EN_HVPG" : en_res})
+    y_true = res_Tr["True_HVPG"]
+    y_pred_RF = res_Tr["RF_HVPG"]
+    y_pred_EN = res_Tr["EN_HVPG"]
+    metrics_Tr = radipop_utils.inference.quantitation_metrics_RF_and_EN(y_true, y_pred_RF, y_pred_EN) 
+
     # evaluate on the internal test set
     rf_res = modelRF.predict(X_iTs)
     en_res = modelEN.predict(X_iTs)
@@ -119,6 +131,10 @@ def main_function():
 
 
     # save results
+    dst_Tr = OUTDIR / "regression" / RADIOMICS_OPTION / "raw_results_training_set.xlsx"
+    res_Tr.to_excel(dst_Tr)
+    print(f"Results saved to {dst_Tr}")
+    
     dst_iTs = OUTDIR / "regression" / RADIOMICS_OPTION / "raw_results_internal_test_set.xlsx"
     res_iTs.to_excel(dst_iTs)
     print(f"Results saved to {dst_iTs}")
@@ -126,6 +142,11 @@ def main_function():
     dst_eTs = OUTDIR / "regression" / RADIOMICS_OPTION / "raw_results_external_test_set.xlsx"
     res_eTs.to_excel(dst_eTs)
     print(f"Results saved to {dst_eTs}")
+
+
+    dst_metrics_Tr = OUTDIR / "regression" / RADIOMICS_OPTION / "metrics_training_set.xlsx"
+    metrics_Tr.to_excel(dst_metrics_Tr)
+    print(f"Metrics saved to {dst_metrics_Tr}")
 
     dst_metrics_iTs = OUTDIR / "regression" / RADIOMICS_OPTION / "metrics_internal_test_set.xlsx"
     metrics_iTs.to_excel(dst_metrics_iTs)
@@ -138,20 +159,25 @@ def main_function():
     
     
     # print some results to the console
+    print("metrics_training:")
+    print("="*20)
+    pprint(metrics_Tr)
+    print()
+    
     print("metrics_training_CV5:")
     print("="*20)
     pprint(metrics_training_CV5)
-    print("\n\n")
+    print()
     
     print("metrics_iTs:")
     print("="*20)
     pprint(metrics_iTs)
-    print("\n\n")
+    print()
 
     print("metrics_eTs:")
     print("="*20)
     pprint(metrics_eTs)
-    print("\n\n")
+    print()
     
     return None
 
