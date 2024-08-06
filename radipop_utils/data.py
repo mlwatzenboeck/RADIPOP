@@ -114,6 +114,38 @@ def load_HVPG_values_and_radiomics(DATASET: str, RADIOMICS_OPTION: str, DATA_ROO
     return df_Tr, df_iTs, df_eTs
 
 
+def save_loaded_radiomics_for_quickload(df_Tr, df_eTs, df_iTs, save_path, verbose=True):
+    df_Tr.to_csv(save_path / "df_Tr.csv", index=False)
+    df_eTs.to_csv(save_path / "df_eTs.csv", index=False)
+    df_iTs.to_csv(save_path / "df_iTs.csv", index=False)
+    if verbose: 
+        print(f"Data df_Tr.csv, df_eTs.csv, df_iTs.csv saved to: {save_path}")
+
+
+def load_radiomics_for_quickload(save_path, verbose=True):
+    df_Tr = pd.read_csv(save_path / "df_Tr.csv")
+    df_eTs = pd.read_csv(save_path / "df_eTs.csv")
+    df_iTs = pd.read_csv(save_path / "df_iTs.csv")
+    if verbose: 
+        print(f"Data df_Tr.csv, df_eTs.csv, df_iTs.csv loaded from: {save_path}")
+    return df_Tr, df_eTs, df_iTs
+
+
+def quickload_or_combine_radiomics_data(DATASET: str, RADIOMICS_OPTION: str, DATA_ROOT_DIRECTORY: Union[str, Path], verbose=True):
+    DATA_ROOT_DIRECTORY = Path(DATA_ROOT_DIRECTORY)
+    radiomics_dir = DATA_ROOT_DIRECTORY / "radiomics" / DATASET /  RADIOMICS_OPTION
+    if os.path.exists(radiomics_dir / "df_Tr.csv") and os.path.exists(radiomics_dir / "df_eTs.csv") and os.path.exists(radiomics_dir / "df_iTs.csv"):
+        df_Tr, df_eTs, df_iTs = load_radiomics_for_quickload(radiomics_dir, verbose=False)
+        if verbose: 
+            print(f"(Quick) loaded data from: {radiomics_dir}")
+    else:
+        if verbose: 
+            print(f"csv files for quickloading not found. Recombining it from patient subfoders.")
+        df_Tr, df_iTs, df_eTs = radipop_utils.data.load_HVPG_values_and_radiomics(DATASET=DATASET, RADIOMICS_OPTION=RADIOMICS_OPTION, DATA_ROOT_DIRECTORY=DATA_ROOT_DIRECTORY)
+        save_loaded_radiomics_for_quickload(df_Tr, df_eTs, df_iTs, radiomics_dir, verbose=verbose)
+    return df_Tr, df_eTs, df_iTs
+
+
 
 def extract_CV_indices(df_Tr):
     df_Tr = df_Tr.reset_index(drop=True)
@@ -124,6 +156,7 @@ def extract_CV_indices(df_Tr):
         idx_split_ts = df_Tr[~m].index.to_numpy()
         split_indices_CV5_Tr.append([idx_split_tr, idx_split_ts])
     return split_indices_CV5_Tr
+
 
 def preprocess_data(df_Tr, df_iTs, df_eTs, normalize_X=True):
     # extract np arrays
@@ -139,3 +172,5 @@ def preprocess_data(df_Tr, df_iTs, df_eTs, normalize_X=True):
         X_eTs = transformer.transform(X_eTs)
 
     return X_Tr, Y_Tr, X_iTs, Y_iTs, X_eTs, Y_eTs
+
+
