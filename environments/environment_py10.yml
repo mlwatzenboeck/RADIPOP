@@ -1,0 +1,32 @@
+name: pyt3-10r
+channels:
+  - defaults
+  - pytorch
+  - nvidia
+  - conda-forge
+  - anaconda
+#  - radiomics 
+dependencies:
+  - python=3.10
+  - pip
+  - pytorch
+  - pytorch-cuda=12.1
+  - torchaudio
+  - torchvision
+  - ipykernel
+  - pandas
+  - seaborn
+  - pydicom
+  - nibabel
+  - conda-forge::dicom2nifti
+  - simpleitk::simpleitk
+  - numba
+  - anaconda::scikit-learn
+  - conda-forge::python-dotenv
+  - anaconda::openpyxl
+  - scikit-optimize
+  - nb_conda_kernels
+#  - pyradiomics
+  - pip: 
+    - TotalSegmentator
+prefix: /home/cwatzenboeck/anaconda3/envs/pyt3-10r
