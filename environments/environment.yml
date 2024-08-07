@@ -1,0 +1,22 @@
+name: pyt3-9
+channels:
+  - defaults
+dependencies:
+  - python=3.9
+  - pytorch
+  - pytorch-cuda=12.1
+  - torchaudio
+  - torchvision
+  - ipykernel
+  - pandas
+  - seaborn
+  - pydicom
+  - nibabel
+  - conda-forge::dicom2nifti
+  - simpleitk::simpleitk
+  - numba
+  - anaconda::scikit-learn
+  - conda-forge::python-dotenv
+  - anaconda::openpyxl
+  - scikit-optimize
+prefix: /home/cwatzenboeck/anaconda3/envs/pyt3-9

@@ -179,7 +179,8 @@ def extract_and_save_features_from_nii(patientid: str, image_loc: Union[Path, st
                                        check_existence=True,
                                        verbose = True,
                                        window_location_middle : Union[float, None] = 50, 
-                                       window_width : Union[float, None] = 500) -> None:
+                                       window_width : Union[float, None] = 500, 
+                                       use_png_range = False) -> None:
     """
     Extracts radiomics features from NIfTI images and saves them to specified output directory.
 
@@ -231,10 +232,17 @@ def extract_and_save_features_from_nii(patientid: str, image_loc: Union[Path, st
         print(f"Intensity windowing is not used because {window_location_middle =} {window_width=}.")
         img = sitk.ReadImage(image_loc)
     else:
-        windowing_dct = dict(out_range = [0.0, 1.0], 
+        if use_png_range: 
+            print("Using PNG range for windowing. THIS IS ONLY TO CHECK THE OLD RESULTS!")
+            windowing_dct = dict(out_range = [0, 255], 
                         wl = window_location_middle, 
                         ww = window_width, 
-                        dtype = np.float64)
+                        dtype = np.uint8)
+        else:
+            windowing_dct = dict(out_range = [0.0, 1.0], 
+                            wl = window_location_middle, 
+                            ww = window_width, 
+                            dtype = np.float64)
         img = radipop_utils.features.convert_and_extract_from_nii(image_loc, **windowing_dct)      
         
     for tissue_type in tissue_class_dct.keys():
