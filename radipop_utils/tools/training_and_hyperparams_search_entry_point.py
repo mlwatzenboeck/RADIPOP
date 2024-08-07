@@ -127,6 +127,10 @@ def main_function():
 
     # save results
     os.makedirs(OUTDIR / "regression" / RADIOMICS_OPTION, exist_ok=True)
+    organs = ["liver", "spleen"]
+    re_pattern = "^(" + "|".join(organs) + ")"
+    radipop_utils.data.make_and_save_normalization_df(df_Tr.filter(regex=re_pattern), OUTDIR / "regression" / RADIOMICS_OPTION)
+    
     dst = OUTDIR / "regression" / RADIOMICS_OPTION / \
         f"Bayesian_results_{NUM_SEARCHES}_iterations_RFvsEN.xlsx"
     cv_res.to_excel(dst)

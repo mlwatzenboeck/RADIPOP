@@ -7,7 +7,7 @@ import os
 from pathlib import Path
 import pandas as pd
 import numpy as np
-from typing import Literal, Union
+from typing import Literal, Union, Dict
 from glob import glob
 
 
@@ -43,30 +43,35 @@ def get_HVPG_values_and_radiomics_paths(hvpg_data_file: Union[str, Path], radiom
     return df
 
 
+
+def combined_radiomics_features(radiomics_dataframes: Dict[str, pd.DataFrame]) -> pd.DataFrame:
+    df_r1 = radiomics_dataframes["liver"]
+    df_r2 = radiomics_dataframes["spleen"]
+    assert len(df_r1) == 1
+    assert len(df_r2) == 1
+
+    df_r1 = df_r1.loc[:, ~df_r1.columns.str.contains('^Unnamed')]
+    df_r2 = df_r2.loc[:, ~df_r2.columns.str.contains('^Unnamed')]
+
+    # Add prefixes to the columns
+    df_r1 = df_r1.add_prefix('liver: ')
+    df_r2 = df_r2.add_prefix('spleen: ')
+
+    combined_df = pd.concat([df_r1, df_r2], axis=1)
+    return combined_df
+
+
 def load_and_combined_radiomics_features(df_paths: pd.DataFrame) -> pd.DataFrame:
     dfs = []
     df_paths = df_paths.reset_index(drop=True)
     for i in range(len(df_paths)):
-
         patientid = df_paths.loc[i, 'id']
         file_r1 = df_paths.loc[i, 'radiomics-features: liver']
         file_r2 = df_paths.loc[i, 'radiomics-features: spleen']
-
-        df_r1 = pd.read_excel(file_r1)  # these all have just a single row of data
+        df_r1 = pd.read_excel(file_r1)
         df_r2 = pd.read_excel(file_r2)  
-        assert len(df_r1) == 1
-        assert len(df_r2) == 1
-
-        df_r1 = df_r1.loc[:, ~df_r1.columns.str.contains('^Unnamed')]
-        df_r2 = df_r2.loc[:, ~df_r2.columns.str.contains('^Unnamed')]
-
-        # Add prefixes to the columns
-        df_r1 = df_r1.add_prefix('liver: ')
-        df_r2 = df_r2.add_prefix('spleen: ')
-
-        combined_df = pd.concat([df_r1, df_r2], axis=1)
+        combined_df = combined_radiomics_features({"liver": df_r1, "spleen": df_r2})
         combined_df['id'] = patientid
-        
         dfs.append(combined_df)
         
     df_radiomics = pd.concat(dfs, axis=0)
@@ -163,6 +168,8 @@ def preprocess_data(df_Tr, df_iTs, df_eTs, normalize_X=True):
     X_Tr,  Y_Tr  = df_Tr.filter(regex="^liver|^spleen").values, df_Tr["y"].values
     X_iTs, Y_iTs = df_iTs.filter(regex="^liver|^spleen").values, df_iTs["y"].values
     X_eTs, Y_eTs = df_eTs.filter(regex="^liver|^spleen").values, df_eTs["y"].values
+    assert df_Tr.columns.equals(df_iTs.columns)
+    assert df_Tr.columns.equals(df_eTs.columns)
 
     if normalize_X:
         # Normalize mostly for numerical stability. Also important for ElasticNet and just good practice in general
@@ -174,3 +181,46 @@ def preprocess_data(df_Tr, df_iTs, df_eTs, normalize_X=True):
     return X_Tr, Y_Tr, X_iTs, Y_iTs, X_eTs, Y_eTs
 
 
+# Note better used the version independent of data below 
+def preprocess_data_single(df_Tr_for_fit, df, normalize_X=True, return_cols = False):
+    # extract np arrays
+    dff1 = df_Tr_for_fit.filter(regex="^liver|^spleen")
+    dff2 = df.filter(regex="^liver|^spleen")
+    assert dff1.columns.equals(dff2.columns)
+    X_Tr= dff1.values
+    X = dff2.values
+
+    if normalize_X:
+        transformer = StandardScaler().fit(X_Tr)  # fit on training data only
+        X = transformer.transform(X)
+    if return_cols:
+        return X, dff2.columns
+    else:
+        return X
+    
+def make_normalization_df(df):
+    c1 = list(df.columns)
+    c2 = list(df.mean())
+    c3 = list(df.std())
+    normalization_df = pd.DataFrame({"name": c1, "mean": c2, "std": c3}).set_index("name").transpose()
+    return normalization_df
+
+def make_and_save_normalization_df(df, model_dir):
+    normalization_df = make_normalization_df(df)
+    normalization_df.to_csv(model_dir / "normalization.csv")
+    return normalization_df
+
+def make_scaler_from_normalization_df(normalization_df):
+    mean = normalization_df.loc["mean"].values
+    std = normalization_df.loc["std"].values
+    scaler = StandardScaler()
+    scaler.mean_ = mean
+    scaler.scale_ = std
+    scaler.var_ = std**2
+    scaler.n_samples_seen_ = len(mean)
+    scaler.feature_names_in_ = normalization_df.columns
+    return scaler
+
+def load_normalization_df(model_dir):
+    normalization_df = pd.read_csv(model_dir / "normalization.csv", index_col=0)
+    return normalization_df
