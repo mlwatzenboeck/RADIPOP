@@ -65,8 +65,9 @@ def main_function():
     SEARCH_SCORING_METRIC = args.search_scoring_metric
 
     # Load the data
-    df_Tr, df_iTs, df_eTs = radipop_utils.data.load_HVPG_values_and_radiomics(
-        DATASET=DATASET, RADIOMICS_OPTION=RADIOMICS_OPTION, DATA_ROOT_DIRECTORY=DATA_ROOT_DIRECTORY)
+    df_Tr, df_iTs, df_eTs = radipop_utils.data.quickload_or_combine_radiomics_data(DATASET=DATASET, 
+                                                                                   RADIOMICS_OPTION=RADIOMICS_OPTION, 
+                                                                                   DATA_ROOT_DIRECTORY=DATA_ROOT_DIRECTORY, verbose=True)
     print(f"{len(df_Tr)=}, {len(df_eTs)=}, {len(df_iTs)=}")
 
     split_indices_CV5_Tr = radipop_utils.data.extract_CV_indices(df_Tr)
