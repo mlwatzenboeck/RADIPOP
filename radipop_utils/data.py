@@ -157,8 +157,8 @@ def extract_CV_indices(df_Tr):
     split_indices_CV5_Tr = []
     for i in range(5):
         m = df_Tr["Tr split"] == i
-        idx_split_tr = df_Tr[m].index.to_numpy()
-        idx_split_ts = df_Tr[~m].index.to_numpy()
+        idx_split_tr = df_Tr[~m].index.to_numpy()
+        idx_split_ts = df_Tr[m].index.to_numpy()
         split_indices_CV5_Tr.append([idx_split_tr, idx_split_ts])
     return split_indices_CV5_Tr
 
