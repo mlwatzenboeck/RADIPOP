@@ -8,7 +8,6 @@ from pprint import pprint
 import argparse
 
 from sklearn.ensemble import RandomForestRegressor
-# see https://stackoverflow.com/questions/60321389/sklearn-importerror-cannot-import-name-plot-roc-curve
 from sklearn.pipeline import Pipeline
 from sklearn.linear_model import ElasticNet
 import skopt
@@ -21,35 +20,23 @@ import radipop_utils.utils
 import radipop_utils.data
 
 
-# load user/ system specific env variables:
-from dotenv import dotenv_values, find_dotenv
-# load environment variables as dictionary
-config = dotenv_values(find_dotenv())
-DATA_ROOT_DIRECTORY_DEFAULT = Path(config["DATA_ROOT_DIRECTORY"])
-
-path = Path(os.path.abspath(radipop_utils.__file__))
-RADIPOP_PACKAGE_ROOT = path.parent.parent
-
-
 def main_function():
-
     parser = argparse.ArgumentParser(
         description='Training and Hyperparameter Search',
         formatter_class=argparse.ArgumentDefaultsHelpFormatter)
 
-    parser.add_argument('--data_root_directory', type=str, default=str(DATA_ROOT_DIRECTORY_DEFAULT),
-                        help='Root directory of the data. (default: %(default)s)')
-    parser.add_argument('--outdir', type=str, default=str(DATA_ROOT_DIRECTORY_DEFAULT / "radiomics" / "Dataset125_LSS"),
-                        help='Output directory. (default: %(default)s)')
-    parser.add_argument('--dataset', type=str, default="Dataset125_LSS",
-                        help='Dataset name. (default: %(default)s)')
-    parser.add_argument('--radiomics_option', type=str, default="radipop_111",
-                        help='Radiomics option. (default: %(default)s)')
+    parser.add_argument('--data_Tr', type=Path,
+                        help='Path to the CSV file containing the training data.')
+    
+    parser.add_argument('--outdir', type=Path, 
+                        help='Output directory for model, hyper_params serach results, normalization_df, ... .')
+    
     parser.add_argument('--num_searches', type=int, default=10,
-                        help='Number of hyperparameter searches (e.g. "r2" or "neg_root_mean_squared_error"). (default: %(default)s)')
+                        help='Number of hyperparameter searches (default: %(default)s)')
+    
     parser.add_argument('--search_scoring_metric', type=str, default="r2",
-                        help='Scoring metric for hyperparameter search. (default: %(default)s)')
-
+                        help='Scoring metric for hyperparameter search. (e.g. "r2", "neg_root_mean_squared_error", ... ). (default: %(default)s)')
+    
     args = parser.parse_args()
     args_dict = vars(args)
     print("Used arguments: ")
@@ -57,23 +44,28 @@ def main_function():
     pprint(args_dict)
     print()
 
-    DATA_ROOT_DIRECTORY = Path(args.data_root_directory)
-    OUTDIR = Path(args.outdir)
-    DATASET = args.dataset
-    RADIOMICS_OPTION = args.radiomics_option
+    training_data_csv_file = Path(args.data_Tr)
+    outdir = Path(args.outdir)
     NUM_SEARCHES = args.num_searches
     SEARCH_SCORING_METRIC = args.search_scoring_metric
-
-    # Load the data
-    df_Tr, df_iTs, df_eTs = radipop_utils.data.quickload_or_combine_radiomics_data(DATASET=DATASET, 
-                                                                                   RADIOMICS_OPTION=RADIOMICS_OPTION, 
-                                                                                   DATA_ROOT_DIRECTORY=DATA_ROOT_DIRECTORY, verbose=True)
-    print(f"{len(df_Tr)=}, {len(df_eTs)=}, {len(df_iTs)=}")
-
+    
+    organs = ["liver", "spleen"]
+    
+    # make out dir if not exists
+    os.makedirs(outdir, exist_ok=True)
+    
+    # load data, filter to relevant features only get split indices
+    df_Tr = pd.read_csv(training_data_csv_file)
+    print(f"Loaded data from {training_data_csv_file} with {len(df_Tr)=}") 
     split_indices_CV5_Tr = radipop_utils.data.extract_CV_indices(df_Tr)
+    re_pattern = "^(" + "|".join(organs) + ")"
+    df_Tr_X, df_Tr_y = df_Tr.filter(regex=re_pattern), df_Tr["y"]
 
-    X_Tr, Y_Tr, X_iTs, Y_iTs, X_eTs, Y_eTs = radipop_utils.data.preprocess_data(
-        df_Tr, df_iTs, df_eTs, normalize_X=True)
+    # normalize the data and save normalization df
+    normalization_df = radipop_utils.data.make_and_save_normalization_df(df_Tr_X, outdir, verbose=True)
+    scaler  = radipop_utils.data.make_scaler_from_normalization_df(normalization_df)
+    X_Tr = scaler.transform(df_Tr_X)
+    Y_Tr = df_Tr_y.values
 
     # decide on a rought range for the cut parameters for dendrogram
     split_params = [0.5, 0.75, 1, 2.75,  5, 7.5, 10]
@@ -127,24 +119,18 @@ def main_function():
     cv_res = pd.DataFrame(opt0.cv_results_)
 
     # save results
-    os.makedirs(OUTDIR / "regression" / RADIOMICS_OPTION, exist_ok=True)
-    organs = ["liver", "spleen"]
-    re_pattern = "^(" + "|".join(organs) + ")"
-    radipop_utils.data.make_and_save_normalization_df(df_Tr.filter(regex=re_pattern), OUTDIR / "regression" / RADIOMICS_OPTION)
+
     
-    dst = OUTDIR / "regression" / RADIOMICS_OPTION / \
-        f"Bayesian_results_{NUM_SEARCHES}_iterations_RFvsEN.xlsx"
+    dst = outdir / f"Bayesian_results_{NUM_SEARCHES}_iterations_RFvsEN.xlsx"
     cv_res.to_excel(dst)
     print("Saved hyperparams search to : ", dst)
 
     # #### save model trained on the whole training data set and optimal paramters
     idx_best_EN_model = cv_res["mean_test_score"][:NUM_SEARCHES].argmax()
-    idx_best_RF_model = cv_res["mean_test_score"][NUM_SEARCHES:].argmax(
-    ) + NUM_SEARCHES
+    idx_best_RF_model = cv_res["mean_test_score"][NUM_SEARCHES:].argmax() + NUM_SEARCHES
 
     # save optimal parameters as yaml:
-    save_dst = OUTDIR / "regression" / RADIOMICS_OPTION
-    dst = save_dst / "SpearmanRed1_RF_opt_params.yml"
+    dst = outdir / "SpearmanRed1_RF_opt_params.yml"
     data = {**cv_res.iloc[idx_best_RF_model, :].params}
     if "regression" in data:
         data.pop("regression")
@@ -153,7 +139,7 @@ def main_function():
         print("saved params to ", dst)
 
     # save optimal parameters as yaml:
-    dst = save_dst / "SpearmanRed1_EN_opt_params.yml"
+    dst = outdir / "SpearmanRed1_EN_opt_params.yml"
     # make copy to keep original dict unchanged
     data = {**cv_res.iloc[idx_best_EN_model, :].params}
     if "regression" in data:
@@ -173,7 +159,7 @@ def main_function():
     np.random.seed(2023)
     reg_RF.set_params(**cv_res.iloc[idx_best_RF_model, :].params)
     reg_RF.fit(X_Tr, Y_Tr)
-    dst = save_dst / f"SpearmanRed1_RF_opt.p"
+    dst = outdir / f"SpearmanRed1_RF_opt.p"
     with open(dst, "wb") as fp:
         pickle.dump(reg_RF, fp)
         print("Saved model to ", dst)
@@ -186,7 +172,7 @@ def main_function():
     ])
     reg_EN.set_params(**cv_res.iloc[idx_best_EN_model, :].params)
     reg_EN.fit(X_Tr, Y_Tr)
-    dst = save_dst / f"SpearmanRed1_EN_opt.p"
+    dst = outdir / f"SpearmanRed1_EN_opt.p"
     with open(dst, "wb") as fp:
         pickle.dump(reg_EN, fp)
         print("Saved model to ", dst)

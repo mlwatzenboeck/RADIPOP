@@ -99,6 +99,9 @@ def main_function():
         settings = yaml.safe_load(f)
         
     df = pd.read_excel(args.images_and_mask_paths_file)
+    assert "images" in df.columns, "The column 'images' is missing in the Excel file."
+    assert "masks" in df.columns, "The column 'masks' is missing in the Excel file."
+    df = df[["images", "masks"]] # this is all that is needed for the function get_reasonable_binwith
 
     # In the paper wl=60, ww=400 was used, however, a typical soft tissue window is  wl = 50, ww = 500
     # Also in the paper a dtype of np.uint8, out_range = [0,255] -> png was used. While this does not change the results much, 

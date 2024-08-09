@@ -83,18 +83,17 @@ def load_and_combined_radiomics_features(df_paths: pd.DataFrame) -> pd.DataFrame
 
     return df_radiomics
 
-
-def load_HVPG_values_and_radiomics(DATASET: str, RADIOMICS_OPTION: str, DATA_ROOT_DIRECTORY: Union[str, Path]):
-    DATA_ROOT_DIRECTORY = Path(DATA_ROOT_DIRECTORY)
-    paths_and_hvpg_data_file = DATA_ROOT_DIRECTORY / "tabular_data" / "paths_and_hvpg_values" / f"file_paths_and_hvpg_data_{DATASET}.xlsx"
-    radiomics_dir = DATA_ROOT_DIRECTORY / "radiomics" / DATASET /  RADIOMICS_OPTION
-
+def load_HVPG_values_and_radiomics(paths_and_hvpg_data_file, radiomics_dir):
+    
     df = get_HVPG_values_and_radiomics_paths(hvpg_data_file=paths_and_hvpg_data_file, radiomics_dir=radiomics_dir)
+    
+    mandatory_cols = ["id", "y", "radiomics-features: liver", "radiomics-features: spleen"]
+    for col in mandatory_cols:
+        assert col in df.columns, f"Column {col} is missing in the data."
 
     # Check if the data is complete
     m = df["radiomics-features: liver"].isna() | df["radiomics-features: spleen"].isna()
     assert len(df[m])==0, f"some radiomics data is missing: Check {list(df[m]['id'])}"
-
 
     # drop not completed radiomics for now ... this does no harm if the data is complete
     df_  = df.dropna(subset=["radiomics-features: liver", "radiomics-features: spleen"])
@@ -103,19 +102,27 @@ def load_HVPG_values_and_radiomics(DATASET: str, RADIOMICS_OPTION: str, DATA_ROO
     df_radiomics = load_and_combined_radiomics_features(df_)
     df_merged = df.merge(df_radiomics, on='id', how='inner')
 
+    return df_merged
+
+
+def split_radiomics_data(df_merged):
     # final filtered dataframe 
     dff = df_merged.filter(regex="^id|^y|^set type|^Tr split|^liver|^spleen")
-
 
     # splitting the data was already done before hand. Otherwise you might want to do this now
     m_Tr = dff["set type"] == "Tr"
     m_iTs = dff["set type"] == "internal Ts"
     m_eTs = dff["set type"] == "external Ts"
-
+    
     df_Tr  = dff[m_Tr]
     df_iTs = dff[m_iTs]
     df_eTs = dff[m_eTs]
-    
+        
+    m_other = ~m_Tr & ~m_iTs & ~m_eTs
+    df_other = dff[m_other]
+    if len(df_other) > 0:
+        print("Warning: Data other than Tr, internal Ts, external Ts found. This data will be ignored.")
+
     return df_Tr, df_iTs, df_eTs
 
 
@@ -124,7 +131,9 @@ def save_loaded_radiomics_for_quickload(df_Tr, df_eTs, df_iTs, save_path, verbos
     df_eTs.to_csv(save_path / "df_eTs.csv", index=False)
     df_iTs.to_csv(save_path / "df_iTs.csv", index=False)
     if verbose: 
-        print(f"Data df_Tr.csv, df_eTs.csv, df_iTs.csv saved to: {save_path}")
+        print(f"Data df_Tr.csv saved to: {save_path / 'df_Tr.csv'}")
+        print(f"Data df_eTs.csv saved to: {save_path / 'df_eTs.csv'}")
+        print(f"Data df_iTs.csv saved to: {save_path / 'df_iTs.csv'}")
 
 
 def load_radiomics_for_quickload(save_path, verbose=True):
@@ -136,9 +145,7 @@ def load_radiomics_for_quickload(save_path, verbose=True):
     return df_Tr, df_eTs, df_iTs
 
 
-def quickload_or_combine_radiomics_data(DATASET: str, RADIOMICS_OPTION: str, DATA_ROOT_DIRECTORY: Union[str, Path], verbose=True):
-    DATA_ROOT_DIRECTORY = Path(DATA_ROOT_DIRECTORY)
-    radiomics_dir = DATA_ROOT_DIRECTORY / "radiomics" / DATASET /  RADIOMICS_OPTION
+def quickload_or_combine_radiomics_data(paths_and_hvpg_data_file, radiomics_dir, verbose=True):
     if os.path.exists(radiomics_dir / "df_Tr.csv") and os.path.exists(radiomics_dir / "df_eTs.csv") and os.path.exists(radiomics_dir / "df_iTs.csv"):
         df_Tr, df_eTs, df_iTs = load_radiomics_for_quickload(radiomics_dir, verbose=False)
         if verbose: 
@@ -146,7 +153,7 @@ def quickload_or_combine_radiomics_data(DATASET: str, RADIOMICS_OPTION: str, DAT
     else:
         if verbose: 
             print(f"csv files for quickloading not found. Recombining it from patient subfoders.")
-        df_Tr, df_iTs, df_eTs = radipop_utils.data.load_HVPG_values_and_radiomics(DATASET=DATASET, RADIOMICS_OPTION=RADIOMICS_OPTION, DATA_ROOT_DIRECTORY=DATA_ROOT_DIRECTORY)
+        df_Tr, df_iTs, df_eTs = radipop_utils.data.load_HVPG_values_and_radiomics(paths_and_hvpg_data_file, radiomics_dir)
         save_loaded_radiomics_for_quickload(df_Tr, df_eTs, df_iTs, radiomics_dir, verbose=verbose)
     return df_Tr, df_eTs, df_iTs
 
@@ -205,9 +212,11 @@ def make_normalization_df(df):
     normalization_df = pd.DataFrame({"name": c1, "mean": c2, "std": c3}).set_index("name").transpose()
     return normalization_df
 
-def make_and_save_normalization_df(df, model_dir):
+def make_and_save_normalization_df(df, model_dir, verbose=True):
     normalization_df = make_normalization_df(df)
     normalization_df.to_csv(model_dir / "normalization.csv")
+    if verbose:
+        print(f"Normalization dataframe saved to: {model_dir / 'normalization.csv'}")
     return normalization_df
 
 def make_scaler_from_normalization_df(normalization_df):

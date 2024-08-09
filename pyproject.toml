@@ -50,6 +50,7 @@ radipop_suggest_binwidth = "radipop_utils.tools.suggest_radiomics_binwidth_entry
 radipop_training_and_hyperparams_search = "radipop_utils.tools.training_and_hyperparams_search_entry_point:main_function"
 radipop_evaluate_model = "radipop_utils.tools.evaluate_model_entry_point:main_function"
 radipop_segment_and_predict = "radipop_utils.tools.auto_segmentation_and_prediction_entry_point:main_function"
+radipop_combine_radiomics_with_scalar_target_and_split = "radipop_utils.tools.combine_radiomics_with_scalar_target_and_split:main_function"
 
 [project.optional-dependencies]
 dev = [

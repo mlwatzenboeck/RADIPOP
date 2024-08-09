@@ -26,7 +26,9 @@ import SimpleITK as sitk
 import SimpleITK  # for type hinting
 
 
-def dcm2nii(dicom_folder: Path, output_folder: Path, verbose: bool = True, out_id: Optional[str] = None) -> None:
+def dcm2nii(dicom_folder: Path, output_folder: Path, 
+            out_id: Optional[str] = None,
+            verbose: Optional[bool] = True) -> None:
     """
     Convert DICOM files in a folder to NIfTI format and save the result to the output folder.
 
@@ -82,6 +84,25 @@ def dcm2nii(dicom_folder: Path, output_folder: Path, verbose: bool = True, out_i
 
         if verbose:
             print(f"Converted id: {id}  from {dicom_folder}  to {output_folder_new}")
+
+
+
+def load_dicom_files(folder: Path | str) -> list[pydicom.FileDataset]:
+    dicom_files = list(folder.glob("*"))
+    dicom_files = sorted(dicom_files, key=lambda x: int(x.name.split(".")[0]))
+    dicom_files = [pydicom.dcmread(f) for f in dicom_files]
+    patient_id = dicom_files[0].PatientName
+
+    for f in dicom_files:
+        assert f.PatientName == patient_id, f"There seems to be more than one patient in the folder {patient_id} does not match {f.PatientName}"
+    return dicom_files
+
+
+def get_patient_name(folder: Path | str) -> str:
+    dicom_files = load_dicom_files(folder)
+    return dicom_files[0].PatientName
+
+
 
 
 def get_files_dict_by_regex_pattern(base_path, regex_pattern, strict=True):

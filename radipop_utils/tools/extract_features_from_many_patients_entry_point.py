@@ -17,11 +17,13 @@ RADIPOP_PACKAGE_ROOT = path.parent.parent
 config = dotenv_values(find_dotenv())
 
 def extraction_loop(images_and_mask_paths_file: Union[Path, str], output_dir: Union[Path, str], fe_settings: Union[Path, str],
-                    window_location_middle=50, window_width=500, use_png_range=False):
+                    window_location_middle=50, window_width=500, use_png_range=False, check_existence=True):
     df = pd.read_excel(images_and_mask_paths_file)
-    assert "images" in df.columns
-    assert "masks" in df.columns
-    assert "id" in df.columns
+    assert "images" in df.columns, "The column 'images' is missing from the input file."
+    assert "masks" in df.columns, "The column 'masks' is missing from the input file."
+    assert "id" in df.columns, "The column 'id' is missing from the input file."
+    assert len(df) == len(set(df["id"])), "The 'id' column contains duplicates."
+    df = df[["id", "images", "masks"]]
 
     os.makedirs(output_dir, exist_ok=True)
 
@@ -38,7 +40,7 @@ def extraction_loop(images_and_mask_paths_file: Union[Path, str], output_dir: Un
                                                                   output_dir=output_dir,
                                                                   fe_settings_path=fe_settings,
                                                                   tissue_class_dct=tissue_class_dct,
-                                                                  check_existence=True,
+                                                                  check_existence=check_existence,
                                                                   verbose=True,
                                                                   window_location_middle=window_location_middle, 
                                                                   window_width = window_width, 
@@ -71,9 +73,12 @@ def main_function():
     parser.add_argument("--window_width", type=float, 
                     default=500,
                     help="Width of the intesity window. (Default = 500 HU -> soft tissue CT window.)")    
-
+    
     parser.add_argument("--use_png_range", action="store_true", 
                         help="Use out_range [0,255] instead of [0.0, 1.0] and store as uint8.")
+    
+    parser.add_argument("--force_rerun", action="store_true",
+                        help="Force rerun of feature extraction even if output files already exist.")
     
     args = parser.parse_args()
     args_dict = vars(args)
@@ -84,8 +89,9 @@ def main_function():
     
     extraction_loop(args.images_and_mask_paths_file, args.output_dir, args.fe_settings, 
                     window_location_middle=args.window_location_middle, 
-                    window_width = args.window_width, 
-                    use_png_range=args.use_png_range)
+                    window_width=args.window_width, 
+                    use_png_range=args.use_png_range,
+                    check_existence=not args.force_rerun)
     
     # copy fe_settings file to output_dir
     try:

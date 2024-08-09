@@ -7,7 +7,11 @@ from sklearn.pipeline import Pipeline
 from sklearn.linear_model import ElasticNet
 import numpy as np
 import pandas as pd
-from sklearn.metrics import (roc_auc_score, r2_score, mean_squared_error, mean_absolute_error)
+from sklearn.metrics import (explained_variance_score, 
+                             r2_score, 
+                             roc_auc_score, 
+                             mean_squared_error, 
+                             mean_absolute_error)
 from scipy.stats import pearsonr
 from radipop_utils.features import SpearmanReducerCont
 
@@ -83,26 +87,25 @@ def fit_and_prediction_CV5_training(modelRF, modelEN, X_Tr, Y_Tr, split_indices_
     return res_training
 
 
-def quantitation_metrics_RF_and_EN(y_true, y_pred_RF, y_pred_EN):
+def eval_metrics(y_true, y_pred):
     y_true_cat = np.array([0 if x < 10 else 1 for x in y_true])
-
-    y_pred = y_pred_RF
-    results = dict(r2_score = r2_score(y_true, y_pred), 
-                mean_absolute_error = mean_absolute_error(y_true, y_pred),
-                roc_auc_score = roc_auc_score(y_true_cat, y_pred),
-                pearsonr = pearsonr(y_true, y_pred).correlation,
+    results = dict(
+        r2_score = r2_score(y_true, y_pred), 
+        mean_absolute_error = mean_absolute_error(y_true, y_pred),
+        mean_squared_error = mean_squared_error(y_true, y_pred),
+        roc_auc_score = roc_auc_score(y_true_cat, y_pred),
+        pearsonr = pearsonr(y_true, y_pred).correlation,
+        explained_variance_score = explained_variance_score(y_true, y_pred)
     )
+    return results
+
+
+def quantitation_metrics_RF_and_EN(y_true, y_pred_RF, y_pred_EN):
+    results = eval_metrics(y_true, y_pred_RF)
     df_RF = pd.DataFrame(results, index=["RF"])
 
-
-    y_pred = y_pred_EN
-    results = dict(r2_score = r2_score(y_true, y_pred), 
-                mean_absolute_error = mean_absolute_error(y_true, y_pred),
-                roc_auc_score = roc_auc_score(y_true_cat, y_pred),
-                pearsonr = pearsonr(y_true, y_pred).correlation,
-    )
+    results = eval_metrics(y_true, y_pred_EN)
     df_EN = pd.DataFrame(results, index=["EN"])
-
     return pd.concat([df_RF, df_EN])
 
 
