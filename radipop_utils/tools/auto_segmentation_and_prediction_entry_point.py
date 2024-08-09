@@ -18,6 +18,8 @@ import radipop_utils.data
 import radipop_utils.inference
 import radipop_utils.inference_via_total_segmentor
 
+import datetime
+
 
 # needed for loading the settings for the radiomics feature extractor 
 path = Path(os.path.abspath(radipop_utils.__file__))
@@ -45,6 +47,11 @@ def main_function():
     print("Used arguments: ")
     print("---------------")
     pprint(args_dict)
+    
+    # save settings
+    ts = datetime.datetime.now().strftime("%Y-%m-%d_%H:%M:%S")
+    dst = args.output_dir / f"args_settings__auto_segmentation_and_prediction_{ts}.yaml"    
+    radipop_utils.utils.save_args_settings(args_dict, dst)
     
     if args.image_path.endswith(".nii") or args.image_path.endswith(".nii.gz"):
         dicom = False

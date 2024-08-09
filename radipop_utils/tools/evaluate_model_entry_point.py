@@ -11,6 +11,7 @@ import radipop_utils.utils
 import radipop_utils.data
 import radipop_utils.inference
 
+import datetime
 
 # load user/ system specific env variables:
 from dotenv import dotenv_values, find_dotenv
@@ -54,6 +55,11 @@ def main_function():
         args.outdir = args.model_dir
         print("  ->  Output directory is set to model_dir: ", args.outdir)
     print()
+    
+    # save settings
+    ts = datetime.datetime.now().strftime("%Y-%m-%d_%H:%M:%S")
+    dst = args.output_dir / f"args_settings__evaluate_model_{ts}.yaml"    
+    radipop_utils.utils.save_args_settings(args_dict, dst)
 
     model_dir = args.model_dir
     outdir = Path(args.outdir)
@@ -131,6 +137,7 @@ def main_function():
         dst_metrics_Tr = outdir / "metrics_training_set.xlsx"
         metrics_Tr.to_excel(dst_metrics_Tr)
         print(f"Metrics saved to {dst_metrics_Tr}")
+        print()
     
     
     # load the model trained on the whole training set
@@ -162,7 +169,7 @@ def main_function():
         dst_metrics_iTs = outdir / "metrics_internal_test_set.xlsx"
         metrics_iTs.to_excel(dst_metrics_iTs)
         print(f"Metrics saved to {dst_metrics_iTs}")
-
+        print()
 
     # evaluate on the external test set
     if data_eTs != None:
@@ -189,6 +196,7 @@ def main_function():
         dst_metrics_eTs = outdir / "metrics_external_test_set.xlsx"
         metrics_eTs.to_excel(dst_metrics_eTs)
         print(f"Metrics saved to {dst_metrics_eTs}")
+        print()
     
     
     if data_Tr != None:

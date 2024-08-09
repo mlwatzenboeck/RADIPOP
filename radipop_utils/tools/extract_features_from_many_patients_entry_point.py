@@ -9,6 +9,8 @@ import radipop_utils
 import radipop_utils.features
 from typing import Union
 from pprint import pprint
+import datetime
+import yaml
 
 path = Path(os.path.abspath(radipop_utils.__file__))
 RADIPOP_PACKAGE_ROOT = path.parent.parent
@@ -99,6 +101,11 @@ def main_function():
         print(f"Settings file {args.fe_settings} copied to {args.output_dir}")
     except Exception as e:
         print(f"An error occurred while copying the settings file: {e}")
+        
+    ts = datetime.datetime.now().strftime("%Y-%m-%d_%H:%M:%S")
+    dst = args.output_dir / f"args_settings__extract_features_from_many_patients_entry_point_{ts}.yaml"    
+    radipop_utils.utils.save_args_settings(args_dict, dst)
+        
 
 
 if __name__ == "__main__":

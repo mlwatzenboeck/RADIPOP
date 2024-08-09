@@ -13,6 +13,8 @@ import radipop_utils
 import radipop_utils.features
 import radipop_utils.data
 
+import datetime
+
 # path = Path(os.path.abspath(radipop_utils.__file__))
 # RADIPOP_PACKAGE_ROOT = path.parent.parent
 
@@ -49,6 +51,11 @@ def main_function():
     if args.output_dir is None:
         args.output_dir = args.radiomics_dir
         print("  ->  Output directory is set to radiomics_dir: ", args.output_dir)
+    
+    # save settings
+    ts = datetime.datetime.now().strftime("%Y-%m-%d_%H:%M:%S")
+    dst = args.output_dir / f"args_settings__combine_radiomics_with_scalar_target_and_split_{ts}.yaml"    
+    radipop_utils.utils.save_args_settings(args_dict, dst)
     
     print()
     

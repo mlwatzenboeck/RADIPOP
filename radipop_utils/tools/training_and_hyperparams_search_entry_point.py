@@ -19,6 +19,8 @@ from radipop_utils.features import SpearmanReducerCont
 import radipop_utils.utils
 import radipop_utils.data
 
+import datetime
+
 
 def main_function():
     parser = argparse.ArgumentParser(
@@ -43,6 +45,11 @@ def main_function():
     print("---------------")
     pprint(args_dict)
     print()
+    
+    # save settings
+    ts = datetime.datetime.now().strftime("%Y-%m-%d_%H:%M:%S")
+    dst = args.output_dir / f"args_settings__training_and_hyperparams_search_{ts}.yaml"    
+    radipop_utils.utils.save_args_settings(args_dict, dst)
 
     training_data_csv_file = Path(args.data_Tr)
     outdir = Path(args.outdir)

@@ -21,6 +21,9 @@ import shutil
 import re 
 from collections import defaultdict
 from radiomics import featureextractor
+import radipop_utils
+import datetime
+import yaml
 
 import SimpleITK as sitk
 import SimpleITK  # for type hinting
@@ -197,3 +200,29 @@ def suggest_radiomics_binwidth(img: SimpleITK.SimpleITK.Image,
         print(f"Range / binWidth =  {ratio}  (should be 16-128)")
         print(f"Suggestion:  Use a binwith of ~ ", r / ((128 + 16)*0.5))
     return r / ((128 + 16)*0.5)
+
+
+
+def get_commit(repo_path):
+    git_folder = Path(repo_path,'.git')
+    head_name = Path(git_folder, 'HEAD').read_text().split('\n')[0].split(' ')[-1]
+    head_ref = Path(git_folder,head_name)
+    commit = head_ref.read_text().replace('\n','')
+    return commit
+
+
+
+def radipop_git_hash():
+    path = Path(os.path.abspath(radipop_utils.__file__))
+    RADIPOP_PACKAGE_ROOT = path.parent.parent
+    return get_commit(RADIPOP_PACKAGE_ROOT)
+
+
+def save_args_settings(args_dict: dict, file_name : Path):
+    args_settings = args_dict.copy()
+    args_settings["githash radipop"] = radipop_git_hash()
+    args_settings["timestamp"] = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    # Save the dict to dst
+    with open(file_name, "w") as f:
+        yaml.dump(args_settings, f)
+    print(f"Arguments and settings saved to {file_name}")
