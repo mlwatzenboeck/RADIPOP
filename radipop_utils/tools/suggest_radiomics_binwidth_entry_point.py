@@ -5,16 +5,17 @@ from pathlib import Path
 import pandas as pd
 from tqdm import tqdm
 from dotenv import dotenv_values, find_dotenv
-import radipop_utils
-import radipop_utils.features
 from typing import Union
-import radipop_utils.utils
 from tqdm import tqdm
 import yaml
 import SimpleITK as sitk
 import numpy as np 
 import argparse
 import pprint
+
+import radipop_utils
+import radipop_utils.features
+import radipop_utils.utils
 
 path = Path(os.path.abspath(radipop_utils.__file__))
 RADIPOP_PACKAGE_ROOT = path.parent.parent

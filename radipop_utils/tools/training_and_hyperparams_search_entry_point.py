@@ -46,9 +46,12 @@ def main_function():
     pprint(args_dict)
     print()
     
+    # make out dir if not exists
+    os.makedirs(args.outdir, exist_ok=True)
+    
     # save settings
     ts = datetime.datetime.now().strftime("%Y-%m-%d_%H:%M:%S")
-    dst = args.output_dir / f"args_settings__training_and_hyperparams_search_{ts}.yaml"    
+    dst = args.outdir / f"args_settings__training_and_hyperparams_search_{ts}.yaml"    
     radipop_utils.utils.save_args_settings(args_dict, dst)
 
     training_data_csv_file = Path(args.data_Tr)
@@ -57,9 +60,6 @@ def main_function():
     SEARCH_SCORING_METRIC = args.search_scoring_metric
     
     organs = ["liver", "spleen"]
-    
-    # make out dir if not exists
-    os.makedirs(outdir, exist_ok=True)
     
     # load data, filter to relevant features only get split indices
     df_Tr = pd.read_csv(training_data_csv_file)

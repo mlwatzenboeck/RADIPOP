@@ -12,6 +12,7 @@ from pprint import pprint
 import radipop_utils
 import radipop_utils.features
 import radipop_utils.data
+import radipop_utils.utils
 
 import datetime
 

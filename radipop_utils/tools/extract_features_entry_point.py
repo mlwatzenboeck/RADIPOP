@@ -6,6 +6,7 @@ from tqdm import tqdm
 from dotenv import dotenv_values, find_dotenv
 import radipop_utils
 import radipop_utils.features
+import radipop_utils.utils
 from typing import Union
 
 path = Path(os.path.abspath(radipop_utils.__file__))

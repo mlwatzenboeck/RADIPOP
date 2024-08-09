@@ -7,6 +7,7 @@ from tqdm import tqdm
 from dotenv import dotenv_values, find_dotenv
 import radipop_utils
 import radipop_utils.features
+import radipop_utils.utils
 from typing import Union
 from pprint import pprint
 import datetime
