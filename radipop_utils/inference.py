@@ -20,6 +20,8 @@ import radipop_utils.features
 import radipop_utils.visualization
 import radipop_utils.inference
 import radipop_utils.data
+from typing import List, Dict, Union, Optional
+from numpy.typing import ArrayLike
 
 
 
@@ -87,6 +89,23 @@ def fit_and_prediction_CV5_training(modelRF, modelEN, X_Tr, Y_Tr, split_indices_
     return res_training
 
 
+def oos_r2_score(y_true: ArrayLike, y_pred: ArrayLike, y_dummy_pred: float) -> float:
+    """Compute out-of-sample R-squared.
+    
+    R² in the usual formuation, leads to leakage of information. 
+    https://medium.com/towards-data-science/whats-wrong-with-r-squared-and-how-to-fix-it-7362c5f26c53
+    It this formulation it makes more sense. 
+    Use for `y_dummy_pred` the mean of the training set.
+    """
+    assert len(y_true) == len(y_pred)
+    assert isinstance(y_dummy_pred, (int, float)), "y_dummy_pred must be a number but is of type {}".format(type(y_dummy_pred))
+    y_dummy_pred = np.array([y_dummy_pred] * len(y_true))
+    mse_pred = mean_squared_error(y_true, y_pred)
+    mse_dummy = mean_squared_error(y_true, y_dummy_pred)
+    deltino = 1e-10
+    oos_r2 = 1 - (mse_pred / (mse_dummy + deltino))
+    return oos_r2
+
 def eval_metrics(y_true, y_pred):
     y_true_cat = np.array([0 if x < 10 else 1 for x in y_true])
     results = dict(
@@ -100,13 +119,18 @@ def eval_metrics(y_true, y_pred):
     return results
 
 
-def quantitation_metrics_RF_and_EN(y_true, y_pred_RF, y_pred_EN):
+def quantitation_metrics_RF_and_EN(y_true, y_pred_RF, y_pred_EN, y_train_mean: Optional[float] = None):
     results = eval_metrics(y_true, y_pred_RF)
+    if y_train_mean is not None:
+        results["oos_r2_score"] = oos_r2_score(y_true, y_pred_RF, y_train_mean)
     df_RF = pd.DataFrame(results, index=["RF"])
 
     results = eval_metrics(y_true, y_pred_EN)
+    if y_train_mean is not None:
+        results["oos_r2_score"] = oos_r2_score(y_true, y_pred_EN, y_train_mean)
     df_EN = pd.DataFrame(results, index=["EN"])
     return pd.concat([df_RF, df_EN])
+
 
 
 def get_feature_importancesRF(df_Tr, X_Tr, Y_Tr, modelRF, loaded_params):

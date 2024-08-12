@@ -33,7 +33,7 @@ def main_function():
     parser.add_argument('--model_dir', type=Path,
                         help='Path to the folder containing the models, ...')
 
-    parser.add_argument('--data_Tr', type=Path, default=None, 
+    parser.add_argument('--data_Tr', type=Path,#, default=None,   # needed for oos_R2 -> mandatory
                         help='Path to the CSV file containing the training data.')
     
     parser.add_argument('--data_iTs', type=Path, default=None, 
@@ -77,14 +77,19 @@ def main_function():
     scaler  = radipop_utils.data.make_scaler_from_normalization_df(normalization_df)
     
 
+    df_Tr = pd.read_csv(data_Tr)
+    print(f"{len(df_Tr)=}")
+    X_Tr = scaler.transform(df_Tr.filter(regex=re_pattern)) 
+    Y_Tr = df_Tr["y"].values
+
     ### Evaluate the models on training set with rotating CV
     # Load the data
     if data_Tr != None:
-        df_Tr = pd.read_csv(data_Tr)
-        print(f"{len(df_Tr)=}")
+        # df_Tr = pd.read_csv(data_Tr)
+        # print(f"{len(df_Tr)=}")
         
-        X_Tr = scaler.transform(df_Tr.filter(regex=re_pattern)) 
-        Y_Tr = df_Tr["y"].values
+        # X_Tr = scaler.transform(df_Tr.filter(regex=re_pattern)) 
+        # Y_Tr = df_Tr["y"].values
         
         split_indices_CV5_Tr = radipop_utils.data.extract_CV_indices(df_Tr)
         
@@ -119,7 +124,7 @@ def main_function():
         y_true = res_Tr["True_HVPG"]
         y_pred_RF = res_Tr["RF_HVPG"]
         y_pred_EN = res_Tr["EN_HVPG"]
-        metrics_Tr = radipop_utils.inference.quantitation_metrics_RF_and_EN(y_true, y_pred_RF, y_pred_EN)     
+        metrics_Tr = radipop_utils.inference.quantitation_metrics_RF_and_EN(y_true, y_pred_RF, y_pred_EN, y_train_mean=Y_Tr.mean())     
     
         #### export feature importances
         # <CW:> There might still be a bug in there. It crashed for one radiomics option. 
@@ -160,7 +165,8 @@ def main_function():
         y_true = res_iTs["True_HVPG"]
         y_pred_RF = res_iTs["RF_HVPG"]
         y_pred_EN = res_iTs["EN_HVPG"]
-        metrics_iTs = radipop_utils.inference.quantitation_metrics_RF_and_EN(y_true, y_pred_RF, y_pred_EN) 
+        metrics_iTs = radipop_utils.inference.quantitation_metrics_RF_and_EN(y_true, y_pred_RF, y_pred_EN, y_train_mean=Y_Tr.mean()) 
+
         
         dst_iTs = outdir / "raw_results_internal_test_set.xlsx"
         res_iTs.to_excel(dst_iTs)
@@ -187,7 +193,7 @@ def main_function():
         y_true = res_eTs["True_HVPG"]
         y_pred_RF = res_eTs["RF_HVPG"]
         y_pred_EN = res_eTs["EN_HVPG"]
-        metrics_eTs = radipop_utils.inference.quantitation_metrics_RF_and_EN(y_true, y_pred_RF, y_pred_EN) 
+        metrics_eTs = radipop_utils.inference.quantitation_metrics_RF_and_EN(y_true, y_pred_RF, y_pred_EN, y_train_mean=Y_Tr.mean()) 
         
         dst_eTs = outdir / "raw_results_external_test_set.xlsx"
         res_eTs.to_excel(dst_eTs)
