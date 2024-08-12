@@ -205,6 +205,10 @@ def suggest_radiomics_binwidth(img: SimpleITK.SimpleITK.Image,
 
 def get_commit(repo_path):
     git_folder = Path(repo_path,'.git')
+    if not git_folder.exists():
+        import pkg_resources
+        v = pkg_resources.get_distribution("radipop_utils").version
+        return f"No git folder found. Package version: {v}"
     head_name = Path(git_folder, 'HEAD').read_text().split('\n')[0].split(' ')[-1]
     head_ref = Path(git_folder,head_name)
     commit = head_ref.read_text().replace('\n','')
