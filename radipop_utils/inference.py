@@ -33,6 +33,9 @@ def load_models_and_params(model_dir: Union[str, Path]) -> Tuple[Dict[str, Pipel
     - loaded_models: dict of loaded models
     - loaded_params: dict of loaded hyperparameters
     - models_bare: dict of bare models (without hyperparameters set)
+    
+    Note: 
+    The bare models are currently not containing the StandardScaler; whereas the loaded models (probably) do.
     """  
   
     model_dir = Path(model_dir)

@@ -31,8 +31,11 @@ config = dotenv_values(find_dotenv())  # load environment variables as dictionar
 DATA_ROOT_DIRECTORY = Path(config["DATA_ROOT_DIRECTORY"])
 
 # These all need to match with the loaded model
-fe_settings_path = RADIPOP_PACKAGE_ROOT / "yaml" / "radiomics_fe_setttings_CT_no_preprocessing_spacing_222.yaml"
-model_dir = DATA_ROOT_DIRECTORY / "radiomics" / "Dataset125_LSS" / "regression" / "radipop_222"
+# fe_settings_path = RADIPOP_PACKAGE_ROOT / "yaml" / "radiomics_fe_setttings_CT_no_preprocessing_spacing_222.yaml"
+# model_dir = DATA_ROOT_DIRECTORY / "radiomics" / "Dataset125_LSS" / "regression" / "radipop_222"
+
+fe_settings_path = RADIPOP_PACKAGE_ROOT / "yaml" / "radiomics_fe_setttings_CT_no_preprocessing_spacing_111.yaml"
+model_dir = DATA_ROOT_DIRECTORY / "radiomics/Dataset125_LSS/regression/radipop_nnUNet_spacing_111_WFD"
 
 def main_function():
     parser = argparse.ArgumentParser(
@@ -44,13 +47,13 @@ def main_function():
 
     args = parser.parse_args()
     args_dict = vars(args)
-    print("Used arguments: ")
+    print(f"Running: '{Path(__file__).name}' with the following arguments:")
     print("---------------")
     pprint(args_dict)
     
     # save settings
     ts = datetime.datetime.now().strftime("%Y-%m-%d_%H:%M:%S")
-    dst = args.output_folder / f"args_settings__auto_segmentation_and_prediction_{ts}.yaml"    
+    dst = Path(args.output_folder) / f"args_settings__auto_segmentation_and_prediction_{ts}.yaml"    
     radipop_utils.utils.save_args_settings(args_dict, dst)
     
     if args.image_path.endswith(".nii") or args.image_path.endswith(".nii.gz"):

@@ -13,6 +13,16 @@ import radipop_utils.inference
 
 import datetime
 
+from scipy.spatial.distance import squareform
+from scipy.stats import spearmanr, pearsonr, ttest_ind
+from scipy.cluster import hierarchy
+from collections import defaultdict
+from sklearn.base import BaseEstimator, TransformerMixin
+
+from sklearn.inspection import permutation_importance
+import time
+import matplotlib.pyplot as plt
+
 # load user/ system specific env variables:
 from dotenv import dotenv_values, find_dotenv
 # load environment variables as dictionary
@@ -45,10 +55,12 @@ def main_function():
     parser.add_argument('--outdir', type=str, default=None,
                         help='Output directory. (default: %(default)s -> results are saved to model_dir)')
     
+    n_repeats_permuation_feature_importance = 10
+    compute_importances = True
 
     args = parser.parse_args()
     args_dict = vars(args)
-    print("Used arguments: ")
+    print(f"Running: '{Path(__file__).name}' with the following arguments:")
     print("---------------")
     pprint(args_dict)
     if args.outdir is None:
@@ -77,9 +89,11 @@ def main_function():
     scaler  = radipop_utils.data.make_scaler_from_normalization_df(normalization_df)
     
 
+
     df_Tr = pd.read_csv(data_Tr)
     print(f"{len(df_Tr)=}")
-    X_Tr = scaler.transform(df_Tr.filter(regex=re_pattern)) 
+    X_Tr = scaler.transform(df_Tr.filter(regex=re_pattern))
+    df_Tr_X = df_Tr.filter(regex=re_pattern) # not normalized, but filtered
     Y_Tr = df_Tr["y"].values
 
     ### Evaluate the models on training set with rotating CV
@@ -106,18 +120,18 @@ def main_function():
         y_true = res_training["True_HVPG"]
         y_pred_RF = res_training["RF_HVPG"]
         y_pred_EN = res_training["EN_HVPG"]
-        metrics_training_CV5 = radipop_utils.inference.quantitation_metrics_RF_and_EN(y_true, y_pred_RF, y_pred_EN) 
+        metrics_training_CV5 = radipop_utils.inference.quantitation_metrics_RF_and_EN(y_true, y_pred_RF, y_pred_EN, y_train_mean=Y_Tr.mean())
         dst = outdir / "metrics_training_CV5.xlsx"
         metrics_training_CV5.to_excel(dst)
         print(f"Results saved to {dst}")
 
         # load the model trained on the whole training set
-        modelRF = loaded_models["RF"]
+        modelRF = loaded_models["RF"]  # these contain the StandardScaler
         modelEN = loaded_models["EN"]  
 
         # evaluate on training set (no good performance measure, but useful checking against overfitting)
-        rf_res = modelRF.predict(X_Tr)
-        en_res = modelEN.predict(X_Tr)
+        rf_res = modelRF.predict(df_Tr_X)
+        en_res = modelEN.predict(df_Tr_X)
         res_Tr = pd.DataFrame({"True_HVPG" : Y_Tr, 
                                 "RF_HVPG" : rf_res,
                                 "EN_HVPG" : en_res})
@@ -125,16 +139,7 @@ def main_function():
         y_pred_RF = res_Tr["RF_HVPG"]
         y_pred_EN = res_Tr["EN_HVPG"]
         metrics_Tr = radipop_utils.inference.quantitation_metrics_RF_and_EN(y_true, y_pred_RF, y_pred_EN, y_train_mean=Y_Tr.mean())     
-    
-        #### export feature importances
-        # <CW:> There might still be a bug in there. It crashed for one radiomics option. 
-        # (Different lenght of feature names and feature importances, or similar)
-        #
-        # dst = OUTDIR / "regression" / RADIOMICS_OPTION / "Feature_importances_RF_regressor.xlsx"
-        # feature_impRF = radipop_utils.inference.get_feature_importancesRF(df_Tr, X_Tr, Y_Tr, modelRF, loaded_params)
-        # feature_impRF.to_excel(dst)
-        # print(f"Feature importances saved to {dst}")
-    
+      
         dst_Tr = outdir / "raw_results_training_set.xlsx"
         res_Tr.to_excel(dst_Tr)
         print(f"Results saved to {dst_Tr}")
@@ -143,6 +148,8 @@ def main_function():
         metrics_Tr.to_excel(dst_metrics_Tr)
         print(f"Metrics saved to {dst_metrics_Tr}")
         print()
+        
+
     
     
     # load the model trained on the whole training set
@@ -154,11 +161,12 @@ def main_function():
         df_iTs = pd.read_csv(data_iTs)
         print(f"{len(df_iTs)=}")
         
-        X_iTs = scaler.transform(df_iTs.filter(regex=re_pattern)) 
+        # X_iTs = scaler.transform(df_iTs.filter(regex=re_pattern)) 
+        df_iTs_X = df_iTs.filter(regex=re_pattern) # not normalized, but filtered
         Y_iTs = df_iTs["y"].values
 
-        rf_res = modelRF.predict(X_iTs)
-        en_res = modelEN.predict(X_iTs)
+        rf_res = modelRF.predict(df_iTs_X)
+        en_res = modelEN.predict(df_iTs_X)
         res_iTs = pd.DataFrame({"True_HVPG" : Y_iTs, 
                                 "RF_HVPG" : rf_res,
                                 "EN_HVPG" : en_res})
@@ -176,17 +184,56 @@ def main_function():
         metrics_iTs.to_excel(dst_metrics_iTs)
         print(f"Metrics saved to {dst_metrics_iTs}")
         print()
+        
+
+        if compute_importances:
+            #### export feature importances
+            # Compute permutation importance
+            start_time = time.time()
+            result = permutation_importance(
+                modelRF[-1], modelRF[:-1].transform(df_iTs_X), Y_iTs,
+                n_repeats=n_repeats_permuation_feature_importance, random_state=42, n_jobs=4
+            )
+            elapsed_time = time.time() - start_time
+            print(f"Elapsed time to compute the importances RF: {elapsed_time:.3f} seconds")
+            importances_RF = pd.Series(result.importances_mean, index=modelRF[1].get_feature_names_out()).sort_values(ascending=False)
+            importances_RF.to_excel(outdir / "feature_importances_RF_on_iTs.xlsx")
+            print("Feature importances saved to ", outdir / "feature_importances_RF_on_iTs.xlsx")
+            print("Feature importances RF:")
+            print("="*20)
+            pprint(importances_RF)
+            print()
+            #_ = importances_RF.iloc[:10][::-1].plot.barh()
+            #plt.show()
+
+            # Compute permutation importance
+            start_time = time.time()
+            result = permutation_importance(
+                modelEN[-1], modelEN[:-1].transform(df_iTs_X), Y_iTs,
+                n_repeats=n_repeats_permuation_feature_importance, random_state=42, n_jobs=4
+            )
+            elapsed_time = time.time() - start_time
+            print(f"Elapsed time to compute the importances EN: {elapsed_time:.3f} seconds")
+            importances_EN = pd.Series(result.importances_mean, index=modelEN[1].get_feature_names_out()).sort_values(ascending=False)
+            importances_EN.to_excel(outdir / "feature_importances_EN_on_iTs.xlsx")
+            print("Feature importances saved to ", outdir / "feature_importances_EN_on_iTs.xlsx")
+            print("Feature importances EN:")
+            print("="*20)
+            pprint(importances_EN)
+            print()
+            
 
     # evaluate on the external test set
     if data_eTs != None:
         df_eTs = pd.read_csv(data_eTs)
         print(f"{len(df_eTs)=}")
         
-        X_eTs = scaler.transform(df_eTs.filter(regex=re_pattern)) 
+        # X_eTs = scaler.transform(df_eTs.filter(regex=re_pattern)) 
+        df_eTs_X = df_eTs.filter(regex=re_pattern) # not normalized, but filtered
         Y_eTs = df_eTs["y"].values
 
-        rf_res = modelRF.predict(X_eTs)
-        en_res = modelEN.predict(X_eTs)
+        rf_res = modelRF.predict(df_eTs_X)
+        en_res = modelEN.predict(df_eTs_X)
         res_eTs = pd.DataFrame({"True_HVPG" : Y_eTs, 
                                 "RF_HVPG" : rf_res,
                                 "EN_HVPG" : en_res})

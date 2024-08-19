@@ -10,6 +10,7 @@ import argparse
 from sklearn.ensemble import RandomForestRegressor
 from sklearn.pipeline import Pipeline
 from sklearn.linear_model import ElasticNet
+from sklearn.preprocessing import StandardScaler
 import skopt
 
 import radipop_utils
@@ -41,7 +42,7 @@ def main_function():
     
     args = parser.parse_args()
     args_dict = vars(args)
-    print("Used arguments: ")
+    print(f"Running: '{Path(__file__).name}' with the following arguments:")
     print("---------------")
     pprint(args_dict)
     print()
@@ -107,7 +108,7 @@ def main_function():
 
     # create a pipeline
     reg_RF = Pipeline([
-        # ('scaler', StandardScaler()),
+        # ('scaler', StandardScaler()),  # Here I dont want to scale the data. I want to use the same scaler for each CV model
         ('feature_selection', SpearmanReducerCont()),
         ('regression', RandomForestRegressor())
     ])
@@ -122,12 +123,10 @@ def main_function():
         random_state=2023,
         n_jobs=6
     )
-    opt0.fit(X_Tr, Y_Tr)
+    opt0.fit(X_Tr, Y_Tr)  # X_Tr is already scaled
     cv_res = pd.DataFrame(opt0.cv_results_)
 
     # save results
-
-    
     dst = outdir / f"Bayesian_results_{NUM_SEARCHES}_iterations_RFvsEN.xlsx"
     cv_res.to_excel(dst)
     print("Saved hyperparams search to : ", dst)
@@ -155,17 +154,19 @@ def main_function():
         yaml.dump(data, outfile, default_flow_style=False)
         print("saved params to ", dst)
 
+    # save optimal models including the scaler
     # ---- set best performing en/rf models
     # create a pipeline
     reg_RF = Pipeline([
-        # ('scaler', StandardScaler()),
+        ('scaler', StandardScaler()),   # will be fit to traing data again. But is is ok. I just wanted to have the same scaler for each CV model 
         ('feature_selection', SpearmanReducerCont()),
         ('regression', RandomForestRegressor())
     ])
+    reg_RF.set_output(transform="pandas")
     # Set params
     np.random.seed(2023)
     reg_RF.set_params(**cv_res.iloc[idx_best_RF_model, :].params)
-    reg_RF.fit(X_Tr, Y_Tr)
+    reg_RF.fit(df_Tr_X, Y_Tr)
     dst = outdir / f"SpearmanRed1_RF_opt.p"
     with open(dst, "wb") as fp:
         pickle.dump(reg_RF, fp)
@@ -173,12 +174,13 @@ def main_function():
 
     # create a pipeline
     reg_EN = Pipeline([
-        # ('scaler', StandardScaler()),
+        ('scaler', StandardScaler()),
         ('feature_selection', SpearmanReducerCont()),
         ('regression', ElasticNet())
     ])
+    reg_EN.set_output(transform="pandas")
     reg_EN.set_params(**cv_res.iloc[idx_best_EN_model, :].params)
-    reg_EN.fit(X_Tr, Y_Tr)
+    reg_EN.fit(df_Tr_X, Y_Tr)
     dst = outdir / f"SpearmanRed1_EN_opt.p"
     with open(dst, "wb") as fp:
         pickle.dump(reg_EN, fp)

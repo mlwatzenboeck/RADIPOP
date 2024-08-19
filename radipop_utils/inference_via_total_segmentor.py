@@ -92,16 +92,16 @@ def inference_via_total_segmentor(image_loc: Union[Path, str],
 
         # load_models_and_params
         # TODO make platform independent
-        loaded_models, loaded_params, models_bare = radipop_utils.inference.load_models_and_params(model_dir = model_dir)
+        loaded_models, _, _ = radipop_utils.inference.load_models_and_params(model_dir = model_dir)
 
 
         # load normalization_df and scaler
-        normalization_df = radipop_utils.data.load_normalization_df(model_dir)
-        scaler = radipop_utils.data.make_scaler_from_normalization_df(normalization_df)
-        X = scaler.transform(dfc)
+        # normalization_df = radipop_utils.data.load_normalization_df(model_dir)
+        # scaler = radipop_utils.data.make_scaler_from_normalization_df(normalization_df)
+        # X = scaler.transform(dfc)
 
         # predict
-        y_pred = loaded_models["RF"].predict(X)
+        y_pred = loaded_models["RF"].predict(dfc)
         print(f"Predicted HVPG value: {y_pred[0]:.2f} mmHg")
     
         df = pd.DataFrame({"HVPG": y_pred})

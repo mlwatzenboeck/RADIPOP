@@ -90,7 +90,7 @@ def main_function():
     args = parser.parse_args()
     
     args_dict = vars(args)
-    print("Used arguments: ")
+    print(f"Running: '{Path(__file__).name}' with the following arguments:")
     print("---------------")
     pprint.pprint(args_dict)
     print()
