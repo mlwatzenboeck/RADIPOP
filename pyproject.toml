@@ -68,9 +68,10 @@ skip = '.git,*.pdf,*.svg'
 #
 # ignore-words-list = ''
 
+
 [tool.setuptools.packages.find]
 where = ["."]
-#where = ["radipop_utils"]
+
 
 [project.urls]
 homepage = "https://github.com/mlwatzenboeck/RADIPOP"

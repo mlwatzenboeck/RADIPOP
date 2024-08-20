@@ -55,7 +55,7 @@ def main_function():
     parser.add_argument('--outdir', type=str, default=None,
                         help='Output directory. (default: %(default)s -> results are saved to model_dir)')
     
-    n_repeats_permuation_feature_importance = 10
+    n_repeats_permuation_feature_importance = 50
     compute_importances = True
 
     args = parser.parse_args()

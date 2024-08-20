@@ -30,26 +30,29 @@ path = Path(os.path.abspath(radipop_utils.__file__))
 RADIPOP_PACKAGE_ROOT = path.parent.parent
 
 # load user/ system specific env variables:
-from dotenv import dotenv_values, find_dotenv
-config = dotenv_values(find_dotenv())  # load environment variables as dictionary
+# from dotenv import dotenv_values, find_dotenv
+# config = dotenv_values(find_dotenv())  # load environment variables as dictionary
 
 # path to the data. You will (likely need to change this)
-DATA_ROOT_DIRECTORY = Path(config["DATA_ROOT_DIRECTORY"])
+# DATA_ROOT_DIRECTORY = Path(config["DATA_ROOT_DIRECTORY"])
 
 
-# These all need to match with the loaded model
-fe_settings_path = RADIPOP_PACKAGE_ROOT / "yaml" / "radiomics_fe_setttings_CT_no_preprocessing_spacing_222.yaml"
-model_dir = DATA_ROOT_DIRECTORY / "radiomics" / "Dataset125_LSS" / "regression" / "radipop_222"
+# # These all need to match with the loaded model
+# fe_settings_path = RADIPOP_PACKAGE_ROOT / "yaml" / "radiomics_fe_setttings_CT_no_preprocessing_spacing_222.yaml"
+# model_dir = DATA_ROOT_DIRECTORY / "radiomics" / "Dataset125_LSS" / "regression" / "radipop_222"
 
 def inference_via_total_segmentor(image_loc: Union[Path, str], 
-                                  fe_settings_path: Union[Path, str] = fe_settings_path, 
-                                  model_dir: Union[Path, str] = model_dir, 
+                                  fe_settings_path: Union[Path, str, None] = None, 
+                                  model_dir: Union[Path, str, None] = None, 
                                   dicom=False, 
-                                  output_folder : Union[str, None] =None):
+                                  output_folder : Union[str, None] = None):
     
+    if fe_settings_path == None:
+        fe_settings_path = radipop_utils.inference.load_fe_settings_from_package()
+        print(f"Using default settings for radiomics feature extraction: {fe_settings_path}")    
     fe_settings_path = Path(fe_settings_path)
-    model_dir = Path(model_dir)
-
+    
+    
     # These must match the settings used for training the model
     window_location_middle = 50
     window_width = 500
@@ -92,8 +95,14 @@ def inference_via_total_segmentor(image_loc: Union[Path, str],
 
         # load_models_and_params
         # TODO make platform independent
-        loaded_models, _, _ = radipop_utils.inference.load_models_and_params(model_dir = model_dir)
-
+        if model_dir != None:
+            model_dir = Path(model_dir)
+            loaded_models, _, _ = radipop_utils.inference.load_models_and_params(model_dir = model_dir)
+            model = loaded_models["RF"]
+            print(f"Loaded model RF from: {model_dir}")
+        else:
+            model = radipop_utils.inference.load_model_from_package()
+            print(f"Loaded model package")
 
         # load normalization_df and scaler
         # normalization_df = radipop_utils.data.load_normalization_df(model_dir)
@@ -101,7 +110,7 @@ def inference_via_total_segmentor(image_loc: Union[Path, str],
         # X = scaler.transform(dfc)
 
         # predict
-        y_pred = loaded_models["RF"].predict(dfc)
+        y_pred = model.predict(dfc)
         print(f"Predicted HVPG value: {y_pred[0]:.2f} mmHg")
     
         df = pd.DataFrame({"HVPG": y_pred})

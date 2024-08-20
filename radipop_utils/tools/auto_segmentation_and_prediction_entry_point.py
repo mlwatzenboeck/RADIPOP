@@ -26,16 +26,16 @@ path = Path(os.path.abspath(radipop_utils.__file__))
 RADIPOP_PACKAGE_ROOT = path.parent.parent
 
 # load user/ system specific env variables:
-from dotenv import dotenv_values, find_dotenv
-config = dotenv_values(find_dotenv())  # load environment variables as dictionary
-DATA_ROOT_DIRECTORY = Path(config["DATA_ROOT_DIRECTORY"])
+# from dotenv import dotenv_values, find_dotenv
+# config = dotenv_values(find_dotenv())  # load environment variables as dictionary
+# DATA_ROOT_DIRECTORY = Path(config["DATA_ROOT_DIRECTORY"])
+# # These all need to match with the loaded model
+# fe_settings_path = RADIPOP_PACKAGE_ROOT / "yaml" / "radiomics_fe_setttings_CT_no_preprocessing_spacing_111.yaml"
+# model_dir = DATA_ROOT_DIRECTORY / "radiomics/Dataset125_LSS/regression/radipop_nnUNet_spacing_111_ORD"
 
-# These all need to match with the loaded model
-# fe_settings_path = RADIPOP_PACKAGE_ROOT / "yaml" / "radiomics_fe_setttings_CT_no_preprocessing_spacing_222.yaml"
-# model_dir = DATA_ROOT_DIRECTORY / "radiomics" / "Dataset125_LSS" / "regression" / "radipop_222"
-
-fe_settings_path = RADIPOP_PACKAGE_ROOT / "yaml" / "radiomics_fe_setttings_CT_no_preprocessing_spacing_111.yaml"
-model_dir = DATA_ROOT_DIRECTORY / "radiomics/Dataset125_LSS/regression/radipop_nnUNet_spacing_111_WFD"
+# use default settings -> load model from package
+fe_settings_path = None
+model_dir = None
 
 def main_function():
     parser = argparse.ArgumentParser(
