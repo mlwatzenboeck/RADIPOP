@@ -1,0 +1,4 @@
+feature_selection__split_param: 1.4272103466255093
+regression__max_depth: 50
+regression__min_samples_split: 2
+regression__n_estimators: 358
