@@ -105,9 +105,10 @@ def load_HVPG_values_and_radiomics(paths_and_hvpg_data_file, radiomics_dir):
     return df_merged
 
 
-def split_radiomics_data(df_merged):
+def split_radiomics_data(df_merged, 
+                         featurs_regex_filter: str = "^liver|^spleen"):
     # final filtered dataframe 
-    dff = df_merged.filter(regex="^id|^y|^set type|^Tr split|^liver|^spleen")
+    dff = df_merged.filter(regex="^id|^y|^set type|^Tr split|" + featurs_regex_filter)
 
     # splitting the data was already done before hand. Otherwise you might want to do this now
     m_Tr = dff["set type"] == "Tr"

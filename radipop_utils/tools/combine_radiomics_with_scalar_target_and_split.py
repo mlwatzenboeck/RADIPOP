@@ -43,6 +43,10 @@ def main_function():
                         default="df",
                         help="Prefix for the output CSV file names. (Default: df)")
     
+    parser.add_argument("--features_regex_filter", type=str,
+                        default="^liver|^spleen",
+                        help="Regex pattern to filter the features columns. (Default: '^liver|^spleen')")
+    
     args = parser.parse_args()
     
     args_dict = vars(args)
@@ -63,8 +67,11 @@ def main_function():
     df = radipop_utils.data.load_HVPG_values_and_radiomics(paths_and_hvpg_data_file = args.images_and_mask_paths_file, 
                                                                               radiomics_dir = args.radiomics_dir)
     
-    df_Tr, df_iTs, df_eTs = radipop_utils.data.split_radiomics_data(df)
+    df_Tr, df_iTs, df_eTs = radipop_utils.data.split_radiomics_data(df, featurs_regex_filter = args.features_regex_filter)
+    
+    
     print(f"{len(df_Tr)} training samples, {len(df_iTs)} internal test samples, {len(df_eTs)} external test samples.")
+    print("Number of radiomics features: ", len(df_Tr.filter(regex=args.features_regex_filter).columns))
     
     save_path = args.output_dir
     df_Tr.to_csv(save_path / f"{args.output_prefix}_Tr.csv", index=False)
