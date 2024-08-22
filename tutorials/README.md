@@ -13,9 +13,24 @@ pip install -e .
 
 However, if you want to use automatic segmentation (currently only implemented with the `TotalSegmentor`) it is advised to install `pytorch` first on your system by following the official install instructions from their website. E.g. when you use `conda` as a package mananger you might want to use something like this
 
+
 ```bash
+# Option 1: You either don't have graphic card in your PC or you don' care about speed
+# 
 # make new env: 
-conda create --name pyt3-10mc -c conda-forge python=3.10
+conda create --name pyt3-10mc -c conda-forge python=3.10   numpy
+conda activate pyt3-10mc
+
+# After that the other requirements should be handeled by the `pyproject.toml`
+pip install -e . 
+```
+
+
+```bash
+# Option 2: You have a graphic card in your PC and want to use it :) 
+#
+# make new env: 
+conda create --name pyt3-10mc -c conda-forge python=3.10   numpy
 conda activate pyt3-10mc
 
 # Some parts require pytorch
@@ -29,6 +44,9 @@ conda install pytorch torchvision torchaudio pytorch-cuda=11.8 -c pytorch -c nvi
 # After that the other requirements should be handeled by the `pyproject.toml`
 pip install -e . 
 ```
+
+
+
 
 <!-- 
 ## Example `.env`

@@ -40,6 +40,12 @@ def main_function():
     parser.add_argument('--search_scoring_metric', type=str, default="r2",
                         help='Scoring metric for hyperparameter search. (e.g. "r2", "neg_root_mean_squared_error", ... ). (default: %(default)s)')
     
+    parser.add_argument('--hyperparameter_bound__min__feature_selection__split_param', type=float, default=1,
+                        help='Minimum value for the split_param hyperparameter of the feature selection. (default: %(default)s)')
+    
+    parser.add_argument('--hyperparameter_bound__max__feature_selection__split_param', type=float, default=5,
+                        help='Maximum value for the split_param hyperparameter of the feature selection. (default: %(default)s)')
+    
     args = parser.parse_args()
     args_dict = vars(args)
     print(f"Running: '{Path(__file__).name}' with the following arguments:")
@@ -76,16 +82,21 @@ def main_function():
     Y_Tr = df_Tr_y.values
 
     # decide on a rought range for the cut parameters for dendrogram
-    split_params = [0.5, 0.75, 1, 2.75,  5, 7.5, 10]
+    split_params = np.linspace(args.hyperparameter_bound__min__feature_selection__split_param, 
+                               args.hyperparameter_bound__max__feature_selection__split_param,
+                               10)
+    
     for split_param in split_params:
         selector = SpearmanReducerCont(split_param=split_param)
-        print(f"Selected features at height {split_param}:", len(
+        print(f"Selected features out of {X_Tr.shape[1]} at height {split_param}:", len(
             selector.fit(X_Tr, Y_Tr).selected_features))
 
     # #### Fit on `Tr` data with CV and estimate best model + hyper parameters
     # Bounds for hyperparameters
     param_bounds_rf = {
-        'feature_selection__split_param': skopt.space.Real(1, 5, prior="uniform"),
+        'feature_selection__split_param': skopt.space.Real(args.hyperparameter_bound__min__feature_selection__split_param, 
+                                                           args.hyperparameter_bound__max__feature_selection__split_param, 
+                                                           prior="uniform"),
         'regression': [RandomForestRegressor(random_state=2023)],
         'regression__n_estimators': skopt.space.Integer(100, 2000),
         'regression__max_depth': skopt.space.Integer(1, 50),
@@ -93,7 +104,9 @@ def main_function():
     }
 
     param_bounds_en = {
-        'feature_selection__split_param': skopt.space.Real(1, 5, prior="uniform"),
+        'feature_selection__split_param': skopt.space.Real(args.hyperparameter_bound__min__feature_selection__split_param, 
+                                                           args.hyperparameter_bound__max__feature_selection__split_param, 
+                                                           prior="uniform"),
         'regression': [ElasticNet(random_state=2023)],
         'regression__alpha': skopt.space.Real(0.0001, 1.0, 'uniform'),
         'regression__l1_ratio': skopt.space.Real(0, 1.0, 'uniform')
