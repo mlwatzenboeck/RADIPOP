@@ -22,6 +22,7 @@ keywords = [
     'radiomics',
 ]
 dependencies = [
+    "python-dotenv",
     "numpy",
     "pandas",
     "seaborn",
@@ -40,7 +41,9 @@ dependencies = [
     "scikit-image>=0.19.3",
     "torch>=2.1.2",
     "tqdm",
-    "TotalSegmentator"
+    "TotalSegmentator",
+    "ipykernel",
+    "openpyxl"
 ]
 
 [project.scripts]
