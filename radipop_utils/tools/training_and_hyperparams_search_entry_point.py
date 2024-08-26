@@ -57,7 +57,7 @@ def main_function():
     os.makedirs(args.outdir, exist_ok=True)
     
     # save settings
-    ts = datetime.datetime.now().strftime("%Y-%m-%d_%H:%M:%S")
+    ts = datetime.datetime.now().strftime("%Y-%m-%d_%H_%M_%S")
     dst = args.outdir / f"args_settings__training_and_hyperparams_search_{ts}.yaml"    
     radipop_utils.utils.save_args_settings(args_dict, dst)
 

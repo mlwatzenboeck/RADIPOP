@@ -58,7 +58,7 @@ def main_function():
         print("  ->  Output directory is set to radiomics_dir: ", args.output_dir)
     
     # save settings
-    ts = datetime.datetime.now().strftime("%Y-%m-%d_%H:%M:%S")
+    ts = datetime.datetime.now().strftime("%Y-%m-%d_%H_%M_%S")
     dst = args.output_dir / f"args_settings__combine_radiomics_with_scalar_target_and_split_{ts}.yaml"    
     radipop_utils.utils.save_args_settings(args_dict, dst)
     

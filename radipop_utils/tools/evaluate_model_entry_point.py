@@ -69,7 +69,7 @@ def main_function():
     print()
     
     # save settings
-    ts = datetime.datetime.now().strftime("%Y-%m-%d_%H:%M:%S")
+    ts = datetime.datetime.now().strftime("%Y-%m-%d_%H_%M_%S")
     dst = args.outdir / f"args_settings__evaluate_model_{ts}.yaml"    
     radipop_utils.utils.save_args_settings(args_dict, dst)
 
