@@ -52,7 +52,7 @@ def main_function():
     pprint(args_dict)
     
     # save settings
-    ts = datetime.datetime.now().strftime("%Y-%m-%d_%H:%M:%S")
+    ts = datetime.datetime.now().strftime("%Y-%m-%d_%H_%M_%S")
     dst = Path(args.output_folder) / f"args_settings__auto_segmentation_and_prediction_{ts}.yaml"    
     radipop_utils.utils.save_args_settings(args_dict, dst)
     
