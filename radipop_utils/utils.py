@@ -221,11 +221,12 @@ def radipop_git_hash():
     RADIPOP_PACKAGE_ROOT = path.parent.parent
     return get_commit(RADIPOP_PACKAGE_ROOT)
 
-
 def save_args_settings(args_dict: dict, file_name : Path):
     args_settings = args_dict.copy()
     args_settings["githash radipop"] = radipop_git_hash()
     args_settings["timestamp"] = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    # Replace colon with underscore in file name (for windows)
+    file_name = file_name.replace(":", "_")
     # Save the dict to dst
     with open(file_name, "w") as f:
         yaml.dump(args_settings, f)
