@@ -90,15 +90,110 @@ def dcm2nii(dicom_folder: Path, output_folder: Path,
 
 
 
-def load_dicom_files(folder: Path | str) -> list[pydicom.FileDataset]:
+def load_dicom_files(folder: Path | str, sort_key=lambda x: int(x.name.split(".")[0])) -> list[pydicom.FileDataset]:
     dicom_files = list(folder.glob("*"))
-    dicom_files = sorted(dicom_files, key=lambda x: int(x.name.split(".")[0]))
+    dicom_files = sorted(dicom_files, key=sort_key)
     dicom_files = [pydicom.dcmread(f) for f in dicom_files]
     patient_id = dicom_files[0].PatientName
 
     for f in dicom_files:
         assert f.PatientName == patient_id, f"There seems to be more than one patient in the folder {patient_id} does not match {f.PatientName}"
     return dicom_files
+
+
+
+
+attributes_list_default = ['AccessionNumber',
+                  'AcquisitionNumber',
+                  'AdditionalPatientHistory',
+                  'AdmittingDiagnosesDescription',
+                  'Allergies',
+                  'BitsAllocated',
+                  'BitsStored',
+                  'BodyPartExamined',
+                  'CollimatorGridName',
+                  'Columns',
+                  'ContentDate',
+                  'ContentTime',
+                  'DateOfLastCalibration',
+                  'DeidentificationMethodCodeSequence',
+                  'DistanceSourceToDetector',
+                  'Exposure',
+                  'ExposureTime',
+                  'FilterType',
+                  'FocalSpots',
+                  'GeneratorPower',
+                  'Grid',
+                  'HighBit',
+                  'ImageAndFluoroscopyAreaDoseProduct',
+                  'ImageType',
+                  'ImagerPixelSpacing',
+                  'InstanceNumber',
+                  'IssuerOfAccessionNumberSequence',
+                  'KVP',
+                  'Laterality',
+                  'LongitudinalTemporalInformationModified',
+                  'Manufacturer',
+                  'ManufacturerModelName',
+                  'MedicalAlerts',
+                  'Modality',
+                  'OperatorsName',
+                  'OtherPatientNames',
+                  'PatientBirthDate',
+                  'PatientID',
+                  'PatientIdentityRemoved',
+                  'PatientMotherBirthName',
+                  'PatientName',
+                  'PatientOrientation',
+                  'PatientSex',
+                  'PatientState',
+                  'PatientWeight',
+                  'PerformedProtocolCodeSequence',
+                  'PhotometricInterpretation',
+                  'PixelData',
+                  'PixelRepresentation',
+                  'PixelSpacing',
+                  'PlateType',
+                  'PostprocessingFunction',
+                  'ProcedureCodeSequence',
+                  'ProcessingFunction',
+                  'ReferringPhysicianName',
+                  'Rows',
+                  'SOPClassUID',
+                  'SOPInstanceUID',
+                  'SamplesPerPixel',
+                  'Sensitivity',
+                  'SeriesDate',
+                  'SeriesInstanceUID',
+                  'SeriesNumber',
+                  'SeriesTime',
+                  'SoftwareVersions',
+                  'SpecialNeeds',
+                  'SpecificCharacterSet',
+                  'StationAETitle',
+                  'StudyDate',
+                  'StudyID',
+                  'StudyInstanceUID',
+                  'StudyStatusID',
+                  'StudyTime',
+                  'TimeOfLastCalibration',
+                  'ViewPosition',
+                  'WindowCenter',
+                  'WindowWidth']
+
+
+def get_attributes(src: str, attributes_list=attributes_list_default):
+    """
+    Example:
+    src = "/home/clemens/tmp/ID 5/10000049/1000004A/1000004B"
+    get_attributes(src)
+    """
+    src = Path(src)
+    files = load_dicom_files(src, sort_key=lambda x: x)
+    file = files[0]
+    attributes_dict = {attr: getattr(file, attr) for attr in attributes_list}
+    return attributes_dict
+
 
 
 def get_patient_name(folder: Path | str) -> str:

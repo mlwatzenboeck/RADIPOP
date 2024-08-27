@@ -86,9 +86,9 @@ def inference_via_total_segmentor(image_loc: Union[Path, str],
             print(f"Extracting features for tissue type: {tissue_type}")
             features_df = radipop_utils.features.extract_radiomics_features(img, mask == tissue_class_dct[tissue_type], fe_settings_path)
             radiomics_dataframes[tissue_type] = features_df
-        for tissue_type, features_df in radiomics_dataframes.items():
-            out_file = tmp_wd_path / subfolder_name  / f"Features_{tissue_type}.xlsx"
-            features_df.to_excel(out_file)
+        for tissue_type, features_df in radiomics_dataframes.items():   
+            out_file = tmp_wd_path / subfolder_name  / f"Features_{tissue_type}.csv"
+            features_df.to_csv(out_file)
             print(f"Saved features to: {out_file}")    
         dfc = radipop_utils.data.combined_radiomics_features(radiomics_dataframes)
 
