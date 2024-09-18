@@ -220,13 +220,13 @@ def make_and_save_normalization_df(df, model_dir, verbose=True):
         print(f"Normalization dataframe saved to: {model_dir / 'normalization.csv'}")
     return normalization_df
 
-def make_scaler_from_normalization_df(normalization_df):
+def make_scaler_from_normalization_df(normalization_df, deltino=1.0E-9):
     mean = normalization_df.loc["mean"].values
     std = normalization_df.loc["std"].values
     scaler = StandardScaler()
     scaler.mean_ = mean
     scaler.scale_ = std
-    scaler.var_ = std**2
+    scaler.var_ = (std**2 + deltino)
     scaler.n_samples_seen_ = len(mean)
     scaler.feature_names_in_ = normalization_df.columns
     return scaler

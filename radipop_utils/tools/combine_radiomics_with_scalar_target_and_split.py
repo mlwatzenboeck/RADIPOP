@@ -47,6 +47,9 @@ def main_function():
                         default="^liver|^spleen",
                         help="Regex pattern to filter the features columns. (Default: '^liver|^spleen')")
     
+    parser.add_argument("--list_of_ids_to_exclude", nargs="+", default=[],
+                        help="List of patient IDs to exclude from the data.")
+    
     args = parser.parse_args()
     
     args_dict = vars(args)
@@ -67,6 +70,24 @@ def main_function():
     df = radipop_utils.data.load_HVPG_values_and_radiomics(paths_and_hvpg_data_file = args.images_and_mask_paths_file, 
                                                                               radiomics_dir = args.radiomics_dir)
     
+    # exlude some patients if wanted
+    list_of_ids_to_exclude = args.list_of_ids_to_exclude
+    m_ex = df["id"].isin(list_of_ids_to_exclude)
+
+    # Exclude matching patients and print the excluded ones
+    if len(df[m_ex]) > 0:
+        print(f"Excluding {len(df[m_ex])} patients: {list_of_ids_to_exclude}")
+        print(df[m_ex].filter(regex="^id|^y|^set type|^Tr split"))
+        df = df[~m_ex]
+        df.reset_index(drop=True, inplace=True)
+
+    # Check if there are patients in list_of_ids_to_exclude that were not found in the DataFrame
+    ids_found = df["id"].isin(list_of_ids_to_exclude)
+    not_found_ids = [i for i in list_of_ids_to_exclude if i not in df["id"].tolist()]
+
+    if len(not_found_ids) > 0:
+        print(f"Warning: Some patients were not found in the data: {not_found_ids}")
+        
     df_Tr, df_iTs, df_eTs = radipop_utils.data.split_radiomics_data(df, featurs_regex_filter = args.features_regex_filter)
     
     
