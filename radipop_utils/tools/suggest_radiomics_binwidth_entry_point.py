@@ -5,16 +5,17 @@ from pathlib import Path
 import pandas as pd
 from tqdm import tqdm
 from dotenv import dotenv_values, find_dotenv
-import radipop_utils
-import radipop_utils.features
 from typing import Union
-import radipop_utils.utils
 from tqdm import tqdm
 import yaml
 import SimpleITK as sitk
 import numpy as np 
 import argparse
 import pprint
+
+import radipop_utils
+import radipop_utils.features
+import radipop_utils.utils
 
 path = Path(os.path.abspath(radipop_utils.__file__))
 RADIPOP_PACKAGE_ROOT = path.parent.parent
@@ -89,7 +90,7 @@ def main_function():
     args = parser.parse_args()
     
     args_dict = vars(args)
-    print("Used arguments: ")
+    print(f"Running: '{Path(__file__).name}' with the following arguments:")
     print("---------------")
     pprint.pprint(args_dict)
     print()
@@ -99,6 +100,9 @@ def main_function():
         settings = yaml.safe_load(f)
         
     df = pd.read_excel(args.images_and_mask_paths_file)
+    assert "images" in df.columns, "The column 'images' is missing in the Excel file."
+    assert "masks" in df.columns, "The column 'masks' is missing in the Excel file."
+    df = df[["images", "masks"]] # this is all that is needed for the function get_reasonable_binwith
 
     # In the paper wl=60, ww=400 was used, however, a typical soft tissue window is  wl = 50, ww = 500
     # Also in the paper a dtype of np.uint8, out_range = [0,255] -> png was used. While this does not change the results much, 

@@ -22,6 +22,7 @@ keywords = [
     'radiomics',
 ]
 dependencies = [
+    "python-dotenv",
     "numpy",
     "pandas",
     "seaborn",
@@ -29,20 +30,30 @@ dependencies = [
     "pydicom",
     "nibabel",
     "dicom2nifti",
-    "simpleitk",
+    "SimpleITK>=2.2.1",
     "pillow",
     "pyradiomics",
     "numba",
     "scipy",
-    "scikit-learn",
+    "scikit-learn==1.3.0",
     "scikit-optimize", 
-    "scikit-image"
+    "scikit-image", 
+    "scikit-image>=0.19.3",
+    "torch>=2.1.2",
+    "tqdm",
+    "TotalSegmentator",
+    "ipykernel",
+    "openpyxl"
 ]
 
 [project.scripts]
 radipop_extract_features = "radipop_utils.tools.extract_features_entry_point:main_function"
 radipop_extract_features_many_times = "radipop_utils.tools.extract_features_from_many_patients_entry_point:main_function"
 radipop_suggest_binwidth = "radipop_utils.tools.suggest_radiomics_binwidth_entry_point:main_function"
+radipop_training_and_hyperparams_search = "radipop_utils.tools.training_and_hyperparams_search_entry_point:main_function"
+radipop_evaluate_model = "radipop_utils.tools.evaluate_model_entry_point:main_function"
+radipop_segment_and_predict = "radipop_utils.tools.auto_segmentation_and_prediction_entry_point:main_function"
+radipop_combine_radiomics_with_scalar_target_and_split = "radipop_utils.tools.combine_radiomics_with_scalar_target_and_split:main_function"
 
 [project.optional-dependencies]
 dev = [
@@ -60,9 +71,10 @@ skip = '.git,*.pdf,*.svg'
 #
 # ignore-words-list = ''
 
+
 [tool.setuptools.packages.find]
 where = ["."]
-#where = ["radipop_utils"]
+
 
 [project.urls]
 homepage = "https://github.com/mlwatzenboeck/RADIPOP"

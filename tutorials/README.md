@@ -11,6 +11,43 @@ This allows you to install it simply with
 pip install -e .
 ```
 
+However, if you want to use automatic segmentation (currently only implemented with the `TotalSegmentor`) it is advised to install `pytorch` first on your system by following the official install instructions from their website. E.g. when you use `conda` as a package mananger you might want to use something like this
+
+
+```bash
+# Option 1: You either don't have graphic card in your PC or you don' care about speed
+# 
+# make new env: 
+conda create --name pyt3-10mc -c conda-forge python=3.10   numpy
+conda activate pyt3-10mc
+
+# After that the other requirements should be handeled by the `pyproject.toml`
+pip install -e . 
+```
+
+
+```bash
+# Option 2: You have a graphic card in your PC and want to use it :) 
+#
+# make new env: 
+conda create --name pyt3-10mc -c conda-forge python=3.10   numpy
+conda activate pyt3-10mc
+
+# Some parts require pytorch
+# This must first be installed according to the offical website (matching your GPU, ...)
+# https://pytorch.org/get-started/locally/
+
+conda install pytorch torchvision torchaudio pytorch-cuda=11.8 -c pytorch -c nvidia
+
+# check python: torch.cuda.is_available()
+
+# After that the other requirements should be handeled by the `pyproject.toml`
+pip install -e . 
+```
+
+
+
+
 <!-- 
 ## Example `.env`
 
@@ -35,117 +72,103 @@ from dotenv import dotenv_values
 config = dotenv_values(".env"),  # load environment variables as dictionary
 ``` -->
 
-
-
 _________________
 
-## Usage instructions: 
 
-After installing the `radipop_utils` utils package the following commands are available: 
+## How to use on a single CT-scan: 
+Given a CT scan in the form of a DICOM folder or a NII.GZ file we provide a script which can be used to: 
+- create the segmentation masks (e.g. for liver and spleen)
+- extract the corresponding radiomics features
+- predict the (radio-)HVPG using an already trained ML model
 
--  `radipop_suggest_binwidth`-- Estimate a reasonable BinWidth for the radiomics settings of your data
-- `radipop_extract_features`  -- Can be used to extract the radiomics feature from single CT images/ masks. 
-- `radipop_extract_features_many_times` -- Can be used to extract the radiomics feature from  CT images.
-- `radipop_predict` -- TODO!!
+All this can be done by simply running: 
+
+```bash
+radipop_segment_and_predict --image_path IMAGE_PATH --output_folder OUTPUT_FOLDER
+```
+
 
 __________________
 
-## How to use on your own data: 
+## How to retrain use on your own data: 
 
 Let us assume that you have your *own* set CT scans and segmentation masks for some organs, as well some scalar value (e.g. HVPG value measured in close proximity to the CT-scan data) and that you want to 
 - extract the radiomic from the CT scans/masks
 - train some ML models like RandomForrest or ElasticNetRegression for predicting the scalar value (e.g. HVPG) and also utilize recursive feature elimination, as we did in our manuscript. 
 
-We will give a brief description of the suggested workflow to achive this. 
+We will give a brief description of the suggested workflow to achive this. After installing the `radipop_utils` utils package the following commands are available: 
+
+
+-  `radipop_suggest_binwidth`-- Estimate a reasonable BinWidth for the radiomics settings of your data
+<!-- - `radipop_extract_features`  -- Can be used to extract the radiomics feature from single CT images/ masks.  -->
+- `radipop_extract_features_many_times` -- Can be used to extract the radiomics feature from  CT images.
+- `radipop_combine_radiomics_with_scalar_target_and_split`
+- `radipop_training_and_hyperparams_search` -- Get reasonable hyperparameters by running Bayesian optimization (on the training set!)
+- `radipop_evaluate_model` -- Run inference on internal testset (`iTs`) and external testset (`eTs`) and save metrics as well as raw inference.
+
+In essence, you just need to run these command line functions in order, if you want to retrain the model with your own data. 
 
 
 
-## Preliminaries: 
-
-
+### Preliminaries: 
 
 The file with the path-names for the images and masks for `radipop_extract_features_many_times --images_and_mask_paths_file <this file>` as well as the training should look like this: 
 
 
 <img src="../fig/file_paths_and_hvpg_values.png" style="width: 55vw; min-width: 330px;">
 
-Note that this assumes that the training test-split, was well as the rotation (non-overlapping!) cross-validation sets were already defined beforehand. It might for instance make sense to perform a stratified-training test split, with a stratification on scanner-type, sex, health status (as we did) or something similar.
+Note that this assumes that the training test-split, was well as the rotation (non-overlapping!) cross-validation sets were already defined beforehand. It might for instance make sense to perform a stratified-training test split, with a stratification on scanner-type, sex, health status (as we did) or something similar. 
 
+*Yes, I know that there is an error in paths of the screenshot. This is just for illustration purposes. You need the correct paths for your images/masks anyhow.*
 
-
-### TODO Other prelimiary steps 
-
-
-## Workflow
-
-### 1) Adjust the settings for radiomics extraction
-First you need to adjust the settings, in particular the `binWidth` of the [`exampleCT.yaml`](../yaml/exampleCT.yaml) to your data. 
-It is suggested (in the radiomics package) that the number of bins should be 16-128. This means that you need to adjust the ratio of the value range (of the ROI) to the binWidth should be 16-128. We preform a conveneint script for estimating the binWidth: `radipop_suggest_binwidth`
-
-```bash
-$ radipop_suggest_binwidth -h
-
-usage: radipop_suggest_binwidth [-h] [--images_and_mask_paths_file IMAGES_AND_MASK_PATHS_FILE]
-                                [--fe_settings FE_SETTINGS] [--frac FRAC]
-                                [--window_location_middle WINDOW_LOCATION_MIDDLE] [--window_width WINDOW_WIDTH]
-
-Read the radiomics file you intend to use and suggest an estimate for the binwidth
-
-optional arguments:
-  -h, --help            show this help message and exit
-  --images_and_mask_paths_file IMAGES_AND_MASK_PATHS_FILE
-                        Path to the Excel file containing image and mask paths and patient IDs.
-  --fe_settings FE_SETTINGS
-                        Path to the radiomics feature extraction settings file.
-  --frac FRAC           Use only a random fraction of the images for estimating the binwidth. 
-                        (Speeds up the estimation, at the cost of accuracy.)
-  --window_location_middle WINDOW_LOCATION_MIDDLE
-                        Position (middpoint) of the intesity window. (Default = 50 HU -> soft tissue CT window.)
-  --window_width WINDOW_WIDTH
-                        Width of the intesity window. (Default = 500 HU -> soft tissue CT window.)
-```
-This scripts performs windowing to a certain intensity window, ensures that the output range between `[0, 1]` and suggest binWidth to have 16-128 bins, for the radiomics. Note that the other settings (in particular the resampling_size) is taken from the file `fe_settings` file. 
-We suggest to use the *median spacing* of your dataset for resizing. This way the data is changed as little as possible.
-
-After adjusting the fe_settings file (see [`exampleCT.yaml`](../yaml/exampleCT.yaml)) accordingly you can proceed to extract the radiomics from your dataset. 
-
-
-### 2) radiomics extraction
-
-For extracting the radiomics of your whole dataset we suggest you run the following command: 
+### Workflow
 
 
 ```bash
-$ radipop_extract_features_many_times -h
-usage: radipop_extract_features_many_times [-h] [--images_and_mask_paths_file IMAGES_AND_MASK_PATHS_FILE]
-                                           [--output_dir OUTPUT_DIR] [--fe_settings FE_SETTINGS]
-                                           [--window_location_middle WINDOW_LOCATION_MIDDLE]
-                                           [--window_width WINDOW_WIDTH]
+#!/usr/bin/bash 
 
-Extract and save radiomics features from NIfTI images (paths provided as an xlsx file.)
+health_status=ORD
+images_and_mask_paths_file=/home/cwatzenboeck/data/cirdata/tabular_data/paths_and_hvpg_values/file_paths_and_hvpg_data_Dataset125_LSS_REGRESSION_${health_status}_no_autoseg.xlsx
+radiomics_dir=/home/cwatzenboeck/data/cirdata/radiomics/Dataset125_LSS/radiomics_no_autoseg_spacing_111/
+fe_settings=/home/cwatzenboeck/code/RADIPOP/yaml/radiomics_fe_setttings_CT_no_preprocessing_spacing_111.yaml
+model_dir=/home/cwatzenboeck/data/cirdata/radiomics/Dataset125_LSS/regression/radipop_no_autoseg_spacing_111_${health_status}
 
-optional arguments:
-  -h, --help            show this help message and exit
-  --images_and_mask_paths_file IMAGES_AND_MASK_PATHS_FILE
-                        Path to the Excel file containing image and mask paths and patient IDs.
-  --output_dir OUTPUT_DIR
-                        Directory where the extracted features will be saved.
-  --fe_settings FE_SETTINGS
-                        Path to the radiomics feature extraction settings file.
-  --window_location_middle WINDOW_LOCATION_MIDDLE
-                        Position (middpoint) of the intesity window. (Default = 50 HU -> soft tissue CT window.)
-  --window_width WINDOW_WIDTH
-                        Width of the intesity window. (Default = 500 HU -> soft tissue CT window.)
+
+
+# optional: 
+#   # get a reasonable binwidth and update the fe_settings_file accordingly
+#   radipop_suggest_binwidth \
+#     --images_and_mask_paths_file  $images_and_mask_paths_file \
+#     --frac 0.1  \
+#     --fe_settings $fe_settings
+
+
+# mandatory:
+radipop_extract_features_many_times  \
+   --images_and_mask_paths_file  $images_and_mask_paths_file  \
+   --output_dir $radiomics_dir \
+   --fe_settings $fe_settings
+
+
+radipop_combine_radiomics_with_scalar_target_and_split  \
+    --images_and_mask_paths_file  $images_and_mask_paths_file  \
+    --radiomics_dir $radiomics_dir  \
+    --output_prefix  df_$health_status
+
+
+radipop_training_and_hyperparams_search --data_Tr $radiomics_dir/df_${health_status}_Tr.csv  \
+                                        --outdir $model_dir  \
+                                        --num_searches 100 \
+                                        --search_scoring_metric neg_root_mean_squared_error  
+
+radipop_evaluate_model \
+    --model_dir $model_dir  \
+    --data_iTs $radiomics_dir/df_${health_status}_iTs.csv \
+    --data_eTs $radiomics_dir/df_${health_status}_eTs.csv \
+    --data_Tr $radiomics_dir/df_${health_status}_Tr.csv  \
+
 
 ```
-
-If you only want to extract the radiomics for a single patient you might want to take a look at `radipop_extract_features -h` instead. 
-
-
-### 3) Feature reduction, Training, Validation and Testing
-
-TODO Update and clean up. Basic version is in  [`CW_model_training.ipynb`](../notebooks/CW_model_training.ipynb)).
-
 
 _________________
 
@@ -154,11 +177,14 @@ Just some notes so that I don't forget.
 
 ### Ongoing
 - [ ] Freeze environment and add as [requirements.txt](requirements.txt)
-- [ ] Create pipeline
-  - [x] Feature extraction as a tool. 
-  - [ ] Prediction as a tool (maybe publish trained model to huggingface, or similar)
+- [ ] Add a different segmentation model (trained on many patientes with severe and diverse liver problems)
 
 ### Completed Column ✓
 - [x] Refactor and change to package
-- [x] Add `.yaml` files for the `pyradiomics` settigs and describe in more detail
+- [x] Add `.yaml` files for the `pyradiomics` settigs and describe in more detail how to set `binWidth` ect. 
+- [x] Create pipeline
+  - [x] Feature extraction as a tool. 
+  - [x] Hyperparameter search as a tool. 
+  - [x] Evaluation as a tool. 
+  - [x] Prediction as a tool (maybe publish trained model to huggingface, or similar)
 

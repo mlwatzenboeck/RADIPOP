@@ -179,7 +179,8 @@ def extract_and_save_features_from_nii(patientid: str, image_loc: Union[Path, st
                                        check_existence=True,
                                        verbose = True,
                                        window_location_middle : Union[float, None] = 50, 
-                                       window_width : Union[float, None] = 500) -> None:
+                                       window_width : Union[float, None] = 500, 
+                                       use_png_range = False) -> None:
     """
     Extracts radiomics features from NIfTI images and saves them to specified output directory.
 
@@ -231,10 +232,17 @@ def extract_and_save_features_from_nii(patientid: str, image_loc: Union[Path, st
         print(f"Intensity windowing is not used because {window_location_middle =} {window_width=}.")
         img = sitk.ReadImage(image_loc)
     else:
-        windowing_dct = dict(out_range = [0.0, 1.0], 
+        if use_png_range: 
+            print("Using PNG range for windowing. THIS IS ONLY TO CHECK THE OLD RESULTS!")
+            windowing_dct = dict(out_range = [0, 255], 
                         wl = window_location_middle, 
                         ww = window_width, 
-                        dtype = np.float64)
+                        dtype = np.uint8)
+        else:
+            windowing_dct = dict(out_range = [0.0, 1.0], 
+                            wl = window_location_middle, 
+                            ww = window_width, 
+                            dtype = np.float64)
         img = radipop_utils.features.convert_and_extract_from_nii(image_loc, **windowing_dct)      
         
     for tissue_type in tissue_class_dct.keys():
@@ -264,40 +272,47 @@ def get_most_corr(f, data_train, Y_train):
 
 class SpearmanReducerCont(BaseEstimator, TransformerMixin):
     "custom feature reduction method based on spearman correlations"
-        
-    def __init__(self, split_param = 1):
+    def __init__(self, split_param=1):
         self.split_param = split_param
+        self.selected_features = None
+        self.selected_feature_names = None
     
     def fit(self, X, y=None):
+        if isinstance(X, pd.DataFrame):
+            self.feature_names_ = X.columns
+            X = X.values  # Convert to numpy for processing
+        else:
+            self.feature_names_ = [f"Feature {i}" for i in range(X.shape[1])]
         
         if self.split_param is None:
-            
             self.selected_features = list(np.arange(X.shape[1]))
+            self.selected_feature_names = self.feature_names_[self.selected_features]
             return self
         
-        else:
-            #calculate correlation matrix
-            corr = spearmanr(X).correlation
-
-            # Ensure the correlation matrix is symmetric
-            corr = (corr + corr.T) / 2
-            np.fill_diagonal(corr, 1)
-
-            # We convert the correlation matrix to a distance matrix before performing
-            # hierarchical clustering using Ward's linkage.
-            distance_matrix = 1 - np.abs(corr)
-            dist_linkage = hierarchy.ward(squareform(distance_matrix))
-            cluster_ids = hierarchy.fcluster(dist_linkage, self.split_param, criterion="distance")
-            cluster_id_to_feature_ids = defaultdict(list)
-            for idx, cluster_id in enumerate(cluster_ids):
-                cluster_id_to_feature_ids[cluster_id].append(idx)
-
-            self.selected_features = [get_most_corr(v, X, y) for v in cluster_id_to_feature_ids.values()]
-
-            return self
+        # Calculate correlation matrix
+        corr = spearmanr(X).correlation
+        corr = (corr + corr.T) / 2
+        np.fill_diagonal(corr, 1)
+        
+        # We convert the correlation matrix to a distance matrix before performing
+        # hierarchical clustering using Ward's linkage.
+        distance_matrix = 1 - np.abs(corr)
+        dist_linkage = hierarchy.ward(squareform(distance_matrix))
+        cluster_ids = hierarchy.fcluster(dist_linkage, self.split_param, criterion="distance")
+        cluster_id_to_feature_ids = defaultdict(list)
+        
+        for idx, cluster_id in enumerate(cluster_ids):
+            cluster_id_to_feature_ids[cluster_id].append(idx)
+        
+        self.selected_features = [get_most_corr(v, X, y) for v in cluster_id_to_feature_ids.values()]
+        self.selected_feature_names = [self.feature_names_[i] for i in self.selected_features]
+        
+        return self
 
     def transform(self, X, y=None):
-        #print(self.selected_features)
-        # Perform transformation
+        if isinstance(X, pd.DataFrame):
+            X = X.values  # Ensure we're working with numpy arrays
         return X[:, self.selected_features]
 
+    def get_feature_names_out(self):
+        return self.selected_feature_names

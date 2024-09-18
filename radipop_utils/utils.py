@@ -21,12 +21,17 @@ import shutil
 import re 
 from collections import defaultdict
 from radiomics import featureextractor
+import radipop_utils
+import datetime
+import yaml
 
 import SimpleITK as sitk
 import SimpleITK  # for type hinting
 
 
-def dcm2nii(dicom_folder: Path, output_folder: Path, verbose: bool = True, out_id: Optional[str] = None) -> None:
+def dcm2nii(dicom_folder: Path, output_folder: Path, 
+            out_id: Optional[str] = None,
+            verbose: Optional[bool] = True) -> None:
     """
     Convert DICOM files in a folder to NIfTI format and save the result to the output folder.
 
@@ -82,6 +87,120 @@ def dcm2nii(dicom_folder: Path, output_folder: Path, verbose: bool = True, out_i
 
         if verbose:
             print(f"Converted id: {id}  from {dicom_folder}  to {output_folder_new}")
+
+
+
+def load_dicom_files(folder: Path | str, sort_key=lambda x: int(x.name.split(".")[0])) -> list[pydicom.FileDataset]:
+    dicom_files = list(folder.glob("*"))
+    dicom_files = sorted(dicom_files, key=sort_key)
+    dicom_files = [pydicom.dcmread(f) for f in dicom_files]
+    patient_id = dicom_files[0].PatientName
+
+    for f in dicom_files:
+        assert f.PatientName == patient_id, f"There seems to be more than one patient in the folder {patient_id} does not match {f.PatientName}"
+    return dicom_files
+
+
+
+
+attributes_list_default = ['AccessionNumber',
+                  'AcquisitionNumber',
+                  'AdditionalPatientHistory',
+                  'AdmittingDiagnosesDescription',
+                  'Allergies',
+                  'BitsAllocated',
+                  'BitsStored',
+                  'BodyPartExamined',
+                  'CollimatorGridName',
+                  'Columns',
+                  'ContentDate',
+                  'ContentTime',
+                  'DateOfLastCalibration',
+                  'DeidentificationMethodCodeSequence',
+                  'DistanceSourceToDetector',
+                  'Exposure',
+                  'ExposureTime',
+                  'FilterType',
+                  'FocalSpots',
+                  'GeneratorPower',
+                  'Grid',
+                  'HighBit',
+                  'ImageAndFluoroscopyAreaDoseProduct',
+                  'ImageType',
+                  'ImagerPixelSpacing',
+                  'InstanceNumber',
+                  'IssuerOfAccessionNumberSequence',
+                  'KVP',
+                  'Laterality',
+                  'LongitudinalTemporalInformationModified',
+                  'Manufacturer',
+                  'ManufacturerModelName',
+                  'MedicalAlerts',
+                  'Modality',
+                  'OperatorsName',
+                  'OtherPatientNames',
+                  'PatientBirthDate',
+                  'PatientID',
+                  'PatientIdentityRemoved',
+                  'PatientMotherBirthName',
+                  'PatientName',
+                  'PatientOrientation',
+                  'PatientSex',
+                  'PatientState',
+                  'PatientWeight',
+                  'PerformedProtocolCodeSequence',
+                  'PhotometricInterpretation',
+                  'PixelData',
+                  'PixelRepresentation',
+                  'PixelSpacing',
+                  'PlateType',
+                  'PostprocessingFunction',
+                  'ProcedureCodeSequence',
+                  'ProcessingFunction',
+                  'ReferringPhysicianName',
+                  'Rows',
+                  'SOPClassUID',
+                  'SOPInstanceUID',
+                  'SamplesPerPixel',
+                  'Sensitivity',
+                  'SeriesDate',
+                  'SeriesInstanceUID',
+                  'SeriesNumber',
+                  'SeriesTime',
+                  'SoftwareVersions',
+                  'SpecialNeeds',
+                  'SpecificCharacterSet',
+                  'StationAETitle',
+                  'StudyDate',
+                  'StudyID',
+                  'StudyInstanceUID',
+                  'StudyStatusID',
+                  'StudyTime',
+                  'TimeOfLastCalibration',
+                  'ViewPosition',
+                  'WindowCenter',
+                  'WindowWidth']
+
+
+def get_attributes(src: str, attributes_list=attributes_list_default):
+    """
+    Example:
+    src = "/home/clemens/tmp/ID 5/10000049/1000004A/1000004B"
+    get_attributes(src)
+    """
+    src = Path(src)
+    files = load_dicom_files(src, sort_key=lambda x: x)
+    file = files[0]
+    attributes_dict = {attr: getattr(file, attr) for attr in attributes_list}
+    return attributes_dict
+
+
+
+def get_patient_name(folder: Path | str) -> str:
+    dicom_files = load_dicom_files(folder)
+    return dicom_files[0].PatientName
+
+
 
 
 def get_files_dict_by_regex_pattern(base_path, regex_pattern, strict=True):
@@ -176,3 +295,34 @@ def suggest_radiomics_binwidth(img: SimpleITK.SimpleITK.Image,
         print(f"Range / binWidth =  {ratio}  (should be 16-128)")
         print(f"Suggestion:  Use a binwith of ~ ", r / ((128 + 16)*0.5))
     return r / ((128 + 16)*0.5)
+
+
+
+def get_commit(repo_path):
+    git_folder = Path(repo_path,'.git')
+    if not git_folder.exists():
+        import pkg_resources
+        v = pkg_resources.get_distribution("radipop_utils").version
+        return f"No git folder found. Package version: {v}"
+    head_name = Path(git_folder, 'HEAD').read_text().split('\n')[0].split(' ')[-1]
+    head_ref = Path(git_folder,head_name)
+    commit = head_ref.read_text().replace('\n','')
+    return commit
+
+
+
+def radipop_git_hash():
+    path = Path(os.path.abspath(radipop_utils.__file__))
+    RADIPOP_PACKAGE_ROOT = path.parent.parent
+    return get_commit(RADIPOP_PACKAGE_ROOT)
+
+def save_args_settings(args_dict: dict, file_name: Path):
+    args_settings = args_dict.copy()
+    args_settings["githash radipop"] = radipop_git_hash()
+    args_settings["timestamp"] = datetime.datetime.now().strftime("%Y-%m-%d %H_%M_%S")
+    # Replace colon with underscore in file name (for windows)
+#    file_name = str(file_name).replace(":", "_")
+    # Save the dict to dst
+    with open(file_name, "w") as f:
+        yaml.dump(args_settings, f)
+    print(f"Arguments and settings saved to {file_name}")
