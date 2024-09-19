@@ -45,7 +45,8 @@ def inference_via_total_segmentor(image_loc: Union[Path, str],
                                   fe_settings_path: Union[Path, str, None] = None, 
                                   model_dir: Union[Path, str, None] = None, 
                                   dicom=False, 
-                                  output_folder : Union[str, None] = None):
+                                  output_folder : Union[str, None] = None, 
+                                  save_all_masks=False) -> float:
     
     if fe_settings_path == None:
         fe_settings_path = radipop_utils.inference.load_fe_settings_from_package()
@@ -91,10 +92,27 @@ def inference_via_total_segmentor(image_loc: Union[Path, str],
             features_df.to_csv(out_file)
             print(f"Saved features to: {out_file}")    
         dfc = radipop_utils.data.combined_radiomics_features(radiomics_dataframes)
+        
+        # Create a new mask with only the relevant tissue classes
+        new_tissue_class_dct = {"liver": 1, "spleen": 2}
+        mask = sitk.ReadImage(mask_loc)
+        mask_array = sitk.GetArrayFromImage(mask)
+        mask_array_liver = np.where(mask_array == tissue_class_dct["liver"], 1, 0)
+        mask_array_spleen = np.where(mask_array == tissue_class_dct["spleen"], 1, 0)
+        mask_array_combined = (mask_array_liver * new_tissue_class_dct["liver"] +
+                            mask_array_spleen * new_tissue_class_dct["spleen"])
+        assert np.all(np.unique(mask_array_combined) == [0, 1, 2]), "Error in combining the masks. Overlapping values?"
+
+        mask_combined = sitk.GetImageFromArray(mask_array_combined)
+        mask_combined.CopyInformation(mask)
+        mask_combined_loc = tmp_wd_path / subfolder_name / "mask_liver_and_spleen.nii.gz"
+
+        # Use SimpleITK to save the image
+        sitk.WriteImage(mask_combined, str(mask_combined_loc))
+        
 
 
         # load_models_and_params
-        # TODO make platform independent
         if model_dir != None:
             model_dir = Path(model_dir)
             loaded_models, _, _ = radipop_utils.inference.load_models_and_params(model_dir = model_dir)
@@ -111,15 +129,47 @@ def inference_via_total_segmentor(image_loc: Union[Path, str],
 
         # predict
         y_pred = model.predict(dfc)
-        print(f"Predicted HVPG value: {y_pred[0]:.2f} mmHg")
+        
     
         df = pd.DataFrame({"HVPG": y_pred})
         df.to_csv(tmp_wd_path / subfolder_name / "HVPG_prediction.csv", index=False)
-
-        if output_folder != None:
-            output_folder = Path(output_folder)
-            os.makedirs(output_folder, exist_ok=True)
-            shutil.copytree(tmp_wd_path / subfolder_name, output_folder / "radipop_results")
-            print(f"Saved intermediate results to: '{output_folder}/radipop_results'  ")
         
+
+        if output_folder is not None:
+            output_folder = Path(output_folder)
+            print("Copying results to: ", output_folder)
+            print(f"Consider running \n >>> itksnap -g {output_folder}/base.nii.gz -s {output_folder}/mask_liver_and_spleen.nii.gz \nor a similar viewer to inspect the segmenation.")
+            os.makedirs(output_folder, exist_ok=True)
+            if not save_all_masks:
+                # remove the intermediate masks
+                os.remove(output_folder / "mask_ts.nii.gz")
+                
+            
+            # Copy the contents of tmp_wd_path / subfolder_name into output_folder
+            src_folder = tmp_wd_path / subfolder_name
+            for item in src_folder.iterdir():
+                s = item
+                d = output_folder / item.name
+                if item.is_dir():
+                    shutil.copytree(s, d, dirs_exist_ok=True)
+                else:
+                    shutil.copy2(s, d)
+            
+            if dicom:
+                src = tmp_wd_path / subfolder_name / "base.nii.gz"
+                dst = output_folder  # No 'radipop_results' subfolder
+                # shutil.copy(src, dst)  # Already copied with copytree above
+            else:
+                dst = output_folder / "base.nii.gz"
+                # Create a relative symlink
+                os.symlink(
+                    os.path.relpath(
+                        image_loc,
+                        output_folder
+                    ),
+                    dst
+                )
+                
+    print(f"Predicted HVPG value: {y_pred[0]:.2f} mmHg")
+                
     return y_pred[0]
