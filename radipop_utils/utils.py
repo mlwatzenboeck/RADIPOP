@@ -320,9 +320,11 @@ def save_args_settings(args_dict: dict, file_name: Path):
     args_settings = args_dict.copy()
     args_settings["githash radipop"] = radipop_git_hash()
     args_settings["timestamp"] = datetime.datetime.now().strftime("%Y-%m-%d %H_%M_%S")
-    # Replace colon with underscore in file name (for windows)
-#    file_name = str(file_name).replace(":", "_")
-    # Save the dict to dst
+    # Replace colon with underscore in file name (for Windows)
+    # file_name = str(file_name).replace(":", "_")
+    # Ensure the directory exists
+    file_name.parent.mkdir(parents=True, exist_ok=True)
+    # Save the dict to the destination file
     with open(file_name, "w") as f:
         yaml.dump(args_settings, f)
     print(f"Arguments and settings saved to {file_name}")

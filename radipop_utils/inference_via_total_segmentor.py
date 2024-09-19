@@ -91,10 +91,26 @@ def inference_via_total_segmentor(image_loc: Union[Path, str],
             features_df.to_csv(out_file)
             print(f"Saved features to: {out_file}")    
         dfc = radipop_utils.data.combined_radiomics_features(radiomics_dataframes)
+        
+        # TODO 
+        # create a new mask with only the relevant tissue class: 
+        new_tissue_class_dct = {"liver": 1, "spleen": 2}
+        mask = sitk.ReadImage(mask_loc)
+        mask_array = sitk.GetArrayFromImage(mask)
+        mask_array_liver = np.where(mask_array == tissue_class_dct["liver"], 1, 0)
+        mask_array_spleen = np.where(mask_array == tissue_class_dct["spleen"], 1, 0)
+        mask_array_combined = (mask_array_liver * new_tissue_class_dct["liver"]  + 
+                               mask_array_spleen * new_tissue_class_dct["spleen"])
+        assert np.all(np.unique(mask_array_combined) == [0, 1, 2]), "Error in combining the masks. Overlapping values?"
+        mask_combined = sitk.GetImageFromArray(mask_array_combined)
+        mask_combined.CopyInformation(mask)
+        mask_combined_loc = tmp_wd_path / subfolder_name / "mask_liver_and_spleen.nii.gz"
+        nib.save(mask_combined, mask_combined_loc)
+        print("Saved combined mask to: ", mask_combined_loc)
+        
 
 
         # load_models_and_params
-        # TODO make platform independent
         if model_dir != None:
             model_dir = Path(model_dir)
             loaded_models, _, _ = radipop_utils.inference.load_models_and_params(model_dir = model_dir)
@@ -119,7 +135,26 @@ def inference_via_total_segmentor(image_loc: Union[Path, str],
         if output_folder != None:
             output_folder = Path(output_folder)
             os.makedirs(output_folder, exist_ok=True)
+            
             shutil.copytree(tmp_wd_path / subfolder_name, output_folder / "radipop_results")
+            if dicom:
+                src = tmp_wd_path / subfolder_name / "base.nii.gz"
+                dst = output_folder / "radipop_results"
+                # shutil.copy(src, dst) # already stored ?
+            else: 
+                src = image_loc
+                dst = output_folder / "radipop_results" / "base.nii.gz"
+                # create realtive symlink
+                os.symlink(
+                    os.path.relpath(
+                        image_loc,
+                        output_folder / "radipop_results"
+                    ),
+                    output_folder / "radipop_results" / "base.nii.gz"
+                )
+                
+                
+            
             print(f"Saved intermediate results to: '{output_folder}/radipop_results'  ")
         
     return y_pred[0]
