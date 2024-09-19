@@ -45,7 +45,8 @@ def inference_via_total_segmentor(image_loc: Union[Path, str],
                                   fe_settings_path: Union[Path, str, None] = None, 
                                   model_dir: Union[Path, str, None] = None, 
                                   dicom=False, 
-                                  output_folder : Union[str, None] = None):
+                                  output_folder : Union[str, None] = None, 
+                                  save_all_masks=False) -> float:
     
     if fe_settings_path == None:
         fe_settings_path = radipop_utils.inference.load_fe_settings_from_package()
@@ -108,7 +109,6 @@ def inference_via_total_segmentor(image_loc: Union[Path, str],
 
         # Use SimpleITK to save the image
         sitk.WriteImage(mask_combined, str(mask_combined_loc))
-        print("Saved combined mask to: ", mask_combined_loc)
         
 
 
@@ -140,6 +140,10 @@ def inference_via_total_segmentor(image_loc: Union[Path, str],
             print("Copying results to: ", output_folder)
             print(f"Consider running \n >>> itksnap -g {output_folder}/base.nii.gz -s {output_folder}/mask_liver_and_spleen.nii.gz \nor a similar viewer to inspect the segmenation.")
             os.makedirs(output_folder, exist_ok=True)
+            if not save_all_masks:
+                # remove the intermediate masks
+                os.remove(output_folder / "mask_ts.nii.gz")
+                
             
             # Copy the contents of tmp_wd_path / subfolder_name into output_folder
             src_folder = tmp_wd_path / subfolder_name
