@@ -129,34 +129,43 @@ def inference_via_total_segmentor(image_loc: Union[Path, str],
 
         # predict
         y_pred = model.predict(dfc)
-        print(f"Predicted HVPG value: {y_pred[0]:.2f} mmHg")
+        
     
         df = pd.DataFrame({"HVPG": y_pred})
         df.to_csv(tmp_wd_path / subfolder_name / "HVPG_prediction.csv", index=False)
+        
 
-        if output_folder != None:
+        if output_folder is not None:
             output_folder = Path(output_folder)
+            print("Copying results to: ", output_folder)
+            print(f"Consider running \n >>> itksnap -g {output_folder}/base.nii.gz -s {output_folder}/mask_liver_and_spleen.nii.gz \nor a similar viewer to inspect the segmenation.")
             os.makedirs(output_folder, exist_ok=True)
             
-            shutil.copytree(tmp_wd_path / subfolder_name, output_folder / "radipop_results")
+            # Copy the contents of tmp_wd_path / subfolder_name into output_folder
+            src_folder = tmp_wd_path / subfolder_name
+            for item in src_folder.iterdir():
+                s = item
+                d = output_folder / item.name
+                if item.is_dir():
+                    shutil.copytree(s, d, dirs_exist_ok=True)
+                else:
+                    shutil.copy2(s, d)
+            
             if dicom:
                 src = tmp_wd_path / subfolder_name / "base.nii.gz"
-                dst = output_folder / "radipop_results"
-                # shutil.copy(src, dst) # already stored ?
-            else: 
-                src = image_loc
-                dst = output_folder / "radipop_results" / "base.nii.gz"
-                # create realtive symlink
+                dst = output_folder  # No 'radipop_results' subfolder
+                # shutil.copy(src, dst)  # Already copied with copytree above
+            else:
+                dst = output_folder / "base.nii.gz"
+                # Create a relative symlink
                 os.symlink(
                     os.path.relpath(
                         image_loc,
-                        output_folder / "radipop_results"
+                        output_folder
                     ),
-                    output_folder / "radipop_results" / "base.nii.gz"
+                    dst
                 )
                 
+    print(f"Predicted HVPG value: {y_pred[0]:.2f} mmHg")
                 
-            
-            print(f"Saved intermediate results to: '{output_folder}/radipop_results'  ")
-        
     return y_pred[0]
