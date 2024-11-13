@@ -1,0 +1,18 @@
+
+Bootstrap: docker
+#  (Note that pytorch (container) is only needed for total_segmentor ...) 
+From: pytorch/pytorch:2.3.0-cuda11.8-cudnn8-devel
+%post
+    apt-get update && apt-get install git libsm6 libxext6 -y
+    mkdir -p /data/dataset
+    mkdir /project/
+
+    # install radipop_utils package. 
+    pip install git+https://github.com/mlwatzenboeck/RADIPOP.git@dev_cw
+
+%environment
+    export LC_ALL=C
+%runscript
+    exec /bin/bash "$@"
+%startscript
+    exec /bin/bash "$@"
