@@ -140,9 +140,7 @@ def inference_via_total_segmentor(image_loc: Union[Path, str],
             print("Copying results to: ", output_folder)
             print(f"Consider running \n >>> itksnap -g {output_folder}/base.nii.gz -s {output_folder}/mask_liver_and_spleen.nii.gz \nor a similar viewer to inspect the segmenation.")
             os.makedirs(output_folder, exist_ok=True)
-            if not save_all_masks:
-                # remove the intermediate masks
-                os.remove(output_folder / "mask_ts.nii.gz")
+
                 
             
             # Copy the contents of tmp_wd_path / subfolder_name into output_folder
@@ -154,6 +152,10 @@ def inference_via_total_segmentor(image_loc: Union[Path, str],
                     shutil.copytree(s, d, dirs_exist_ok=True)
                 else:
                     shutil.copy2(s, d)
+            
+            if not save_all_masks:
+                # remove the intermediate masks
+                os.remove(output_folder / "mask_ts.nii.gz")
             
             if dicom:
                 src = tmp_wd_path / subfolder_name / "base.nii.gz"

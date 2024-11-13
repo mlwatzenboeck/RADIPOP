@@ -27,8 +27,9 @@ from numpy.typing import ArrayLike
 import pickle
 import importlib.resources as pkg_resources
 
-def load_model_from_package(model_folder: str = "small_dataset_auto_seg_spacing_111_ORD", model_name : str = "SpearmanRed1_RF_opt.p") -> Pipeline:
+def load_model_from_package(model_folder: str = "small_dataset_auto_seg_spacing_111_WFD", model_name : str = "SpearmanRed1_RF_opt.p") -> Pipeline:
     # Load the model from the package's models directory
+    print(f"Loading model from package: {model_folder}/{model_name}")
     with pkg_resources.path(f'radipop_utils.data_trained_models.{model_folder}', model_name) as model_path:
         with open(model_path, 'rb') as model_file:
             loaded_model = pickle.load(model_file)

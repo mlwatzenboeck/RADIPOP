@@ -8,6 +8,7 @@ import radipop_utils
 import radipop_utils.features
 import radipop_utils.utils
 from typing import Union
+import ast
 
 path = Path(os.path.abspath(radipop_utils.__file__))
 RADIPOP_PACKAGE_ROOT = path.parent.parent
@@ -39,10 +40,20 @@ def main_function():
                     default=500,
                     help="Width of the intesity window. (Default = 500 HU -> soft tissue CT window.)")
     
+    # Add tissue_class_dct argument as a string
+    parser.add_argument("--tissue_class_dct", type=str,
+                        default='{"liver": 1, "spleen": 2}',
+                        help="Dictionary specifying tissue classes in the mask. Default: '{\"liver\": 1, \"spleen\": 2}'. Example (TS): '{\"liver\": 5, \"spleen\": 1}'")
+
+    args = parser.parse_args()
+
+    # Convert the tissue_class_dct string to a dictionary
+    tissue_class_dct = ast.literal_eval(args.tissue_class_dct)
+    
     args = parser.parse_args()
     print(args)
     
-    tissue_class_dct = {"liver": 1, "spleen": 2}
+    # tissue_class_dct = {"liver": 1, "spleen": 2}
    
     radipop_utils.features.extract_and_save_features_from_nii(args.patientid,
                                                                 args.image,
