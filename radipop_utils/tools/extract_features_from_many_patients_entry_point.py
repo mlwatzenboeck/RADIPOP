@@ -144,10 +144,12 @@ def main_function():
     except Exception as e:
         print(f"An error occurred while copying the settings file: {e}")
         
-    ts = datetime.datetime.now().strftime("%Y-%m-%d_%H_%M_%S")
-    dst = args.output_dir / f"args_settings__extract_features_from_many_patients_entry_point_{ts}.yaml"    
-    radipop_utils.utils.save_args_settings(args_dict, dst)
-        
+    # turn of saving if arrayjob 
+    if args.process_only_single_image_row_idx == 1 or args.process_only_single_image_row_idx == None:
+        ts = datetime.datetime.now().strftime("%Y-%m-%d_%H_%M_%S")
+        dst = args.output_dir / f"args_settings__extract_features_from_many_patients_entry_point_{ts}.yaml"    
+        radipop_utils.utils.save_args_settings(args_dict, dst)
+            
 
 
 if __name__ == "__main__":
