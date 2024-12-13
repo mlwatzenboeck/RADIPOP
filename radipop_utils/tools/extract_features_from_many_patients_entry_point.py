@@ -20,7 +20,7 @@ RADIPOP_PACKAGE_ROOT = path.parent.parent
 config = dotenv_values(find_dotenv())
 
 def extraction_loop(images_and_mask_paths_file: Union[Path, str], output_dir: Union[Path, str], fe_settings: Union[Path, str],
-                    window_location_middle=50, window_width=500, use_png_range=False, check_existence=True):
+                    window_location_middle=50, window_width=500, use_png_range=False, check_existence=True, process_only_single_image_row_idx=None):
     df = pd.read_excel(images_and_mask_paths_file)
     assert "images" in df.columns, "The column 'images' is missing from the input file."
     assert "masks" in df.columns, "The column 'masks' is missing from the input file."
@@ -32,24 +32,48 @@ def extraction_loop(images_and_mask_paths_file: Union[Path, str], output_dir: Un
 
     tissue_class_dct = {"liver": 1, "spleen": 2}
 
-    for i in tqdm(range(len(df))):
+
+    if process_only_single_image_row_idx==None:
+        print("Processing all rows in ", images_and_mask_paths_file)
+        for i in tqdm(range(len(df))):
+            image_loc = df.loc[i, "images"]
+            mask_loc = df.loc[i, "masks"]
+            patientid = df.loc[i, "id"]
+
+            radipop_utils.features.extract_and_save_features_from_nii(patientid,
+                                                                    image_loc,
+                                                                    mask_loc,
+                                                                    output_dir=output_dir,
+                                                                    fe_settings_path=fe_settings,
+                                                                    tissue_class_dct=tissue_class_dct,
+                                                                    check_existence=check_existence,
+                                                                    verbose=True,
+                                                                    window_location_middle=window_location_middle, 
+                                                                    window_width = window_width, 
+                                                                    use_png_range=use_png_range)
+        print("Done with feature extraction!")
+    else:
+        print("Processing row={process_only_single_image_row_idx} in ", images_and_mask_paths_file)
+        i = process_only_single_image_row_idx - 1
+        assert i >= 0
         image_loc = df.loc[i, "images"]
         mask_loc = df.loc[i, "masks"]
         patientid = df.loc[i, "id"]
 
         radipop_utils.features.extract_and_save_features_from_nii(patientid,
-                                                                  image_loc,
-                                                                  mask_loc,
-                                                                  output_dir=output_dir,
-                                                                  fe_settings_path=fe_settings,
-                                                                  tissue_class_dct=tissue_class_dct,
-                                                                  check_existence=check_existence,
-                                                                  verbose=True,
-                                                                  window_location_middle=window_location_middle, 
-                                                                  window_width = window_width, 
-                                                                  use_png_range=use_png_range)
+                                                                image_loc,
+                                                                mask_loc,
+                                                                output_dir=output_dir,
+                                                                fe_settings_path=fe_settings,
+                                                                tissue_class_dct=tissue_class_dct,
+                                                                check_existence=check_existence,
+                                                                verbose=True,
+                                                                window_location_middle=window_location_middle, 
+                                                                window_width = window_width, 
+                                                                use_png_range=use_png_range)
 
-    print("Done with feature extraction!")
+        
+        
 
 
 def main_function():
@@ -83,6 +107,9 @@ def main_function():
     parser.add_argument("--force_rerun", action="store_true",
                         help="Force rerun of feature extraction even if output files already exist.")
     
+    parser.add_argument('--process_only_single_image_row_idx', type=int, default=None, 
+                        help="type: int >=1; Row to process e.g. for running in parallel as array-job on cluster. (Default = None -> use all rows in table)")  
+    
     args = parser.parse_args()
     args_dict = vars(args)
     print(f"Running: '{Path(__file__).name}' with the following arguments:")
@@ -94,7 +121,8 @@ def main_function():
                     window_location_middle=args.window_location_middle, 
                     window_width=args.window_width, 
                     use_png_range=args.use_png_range,
-                    check_existence=not args.force_rerun)
+                    check_existence=not args.force_rerun, 
+                    process_only_single_image_row_idx=args.process_only_single_image_row_idx)
     
     # copy fe_settings file to output_dir
     try:
