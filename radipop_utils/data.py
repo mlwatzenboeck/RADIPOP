@@ -97,9 +97,14 @@ def load_HVPG_values_and_radiomics(paths_and_hvpg_data_file, radiomics_dir):
     
     df = get_HVPG_values_and_radiomics_paths(hvpg_data_file=paths_and_hvpg_data_file, radiomics_dir=radiomics_dir)
     
-    mandatory_cols = ["id", "y", "radiomics-features: liver", "radiomics-features: spleen"]
+    mandatory_cols = ["id", "radiomics-features: liver", "radiomics-features: spleen"]
     for col in mandatory_cols:
         assert col in df.columns, f"Column {col} is missing in the data."
+
+    warning_columns = ["y"]
+    for col in warning_columns:
+        if not col in df.columns:
+            print(f"WARNING: {col} is missing in the data.")
 
     # Check if the data is complete
     m = df["radiomics-features: liver"].isna() | df["radiomics-features: spleen"].isna()
