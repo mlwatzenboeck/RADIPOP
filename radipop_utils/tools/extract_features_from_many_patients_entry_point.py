@@ -6,6 +6,7 @@ import pandas as pd
 from tqdm import tqdm
 from dotenv import dotenv_values, find_dotenv
 import radipop_utils
+import radipop_utils.data
 import radipop_utils.features
 import radipop_utils.utils
 from typing import Union
@@ -19,14 +20,7 @@ config = dotenv_values(find_dotenv())
 
 def extraction_loop(images_and_mask_paths_file: Union[Path, str], output_dir: Union[Path, str], fe_settings: Union[Path, str],
                     window_location_middle=50, window_width=500, use_png_range=False, check_existence=True, process_only_single_image_row_idx=None):
-    file_extension = os.path.splitext(images_and_mask_paths_file)[1].lower()
-    if file_extension == ".csv":
-        df = pd.read_csv(images_and_mask_paths_file)
-    elif file_extension in [".xls", ".xlsx"]:
-        df = pd.read_excel(images_and_mask_paths_file)
-    else:
-        raise ValueError("Unsupported file format. Please provide a .csv, .xls, or .xlsx file.")
-
+    df = radipop_utils.data.pandas_read_csv_or_excel(images_and_mask_paths_file)
 
     assert "images" in df.columns, "The column 'images' is missing from the input file."
     assert "masks" in df.columns, "The column 'masks' is missing from the input file."

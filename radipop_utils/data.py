@@ -18,10 +18,20 @@ from radipop_utils.utils import get_files_dict_by_regex_pattern
 import sklearn
 from sklearn.preprocessing  import StandardScaler
 
+def pandas_read_csv_or_excel(file: str | Path):
+    file_extension = os.path.splitext(file)[1].lower()
+    if file_extension == ".csv":
+        df = pd.read_csv(file)
+    elif file_extension in [".xls", ".xlsx"]:
+        df = pd.read_excel(file)
+    else:
+        raise ValueError("Unsupported file format. Please provide a .csv, .xls, or .xlsx file.")
+    return df 
+
 
 def get_HVPG_values_and_radiomics_paths(hvpg_data_file: Union[str, Path], radiomics_dir: Union[str, Path]):
 
-    df = pd.read_excel(hvpg_data_file)
+    df = pandas_read_csv_or_excel(hvpg_data_file)
 
     strict = False
     dct_paths = get_files_dict_by_regex_pattern(radiomics_dir, regex_pattern="^Features_liver", strict=strict)
