@@ -13,15 +13,21 @@ from pprint import pprint
 import datetime
 import yaml
 
-path = Path(os.path.abspath(radipop_utils.__file__))
-RADIPOP_PACKAGE_ROOT = path.parent.parent
 
 # Load environment variables as dictionary
 config = dotenv_values(find_dotenv())
 
 def extraction_loop(images_and_mask_paths_file: Union[Path, str], output_dir: Union[Path, str], fe_settings: Union[Path, str],
                     window_location_middle=50, window_width=500, use_png_range=False, check_existence=True, process_only_single_image_row_idx=None):
-    df = pd.read_excel(images_and_mask_paths_file)
+    file_extension = os.path.splitext(images_and_mask_paths_file)[1].lower()
+    if file_extension == ".csv":
+        df = pd.read_csv(images_and_mask_paths_file)
+    elif file_extension in [".xls", ".xlsx"]:
+        df = pd.read_excel(images_and_mask_paths_file)
+    else:
+        raise ValueError("Unsupported file format. Please provide a .csv, .xls, or .xlsx file.")
+
+
     assert "images" in df.columns, "The column 'images' is missing from the input file."
     assert "masks" in df.columns, "The column 'masks' is missing from the input file."
     assert "id" in df.columns, "The column 'id' is missing from the input file."
@@ -74,23 +80,36 @@ def extraction_loop(images_and_mask_paths_file: Union[Path, str], output_dir: Un
 
         
         
-
+def get_parser_defaults(add_directory_defaults=False):
+    if add_directory_defaults: 
+        DATA_ROOT_DIRECTORY = Path(config["DATA_ROOT_DIRECTORY"])
+        path = Path(os.path.abspath(radipop_utils.__file__))
+        RADIPOP_PACKAGE_ROOT = path.parent.parent
+        defaults_dir = {"images_and_mask_paths_file": RADIPOP_PACKAGE_ROOT / "data" / "file_paths_and_hvpg_data.xlsx", 
+                        "output_dir": DATA_ROOT_DIRECTORY / "radiomics" / "Dataset125_LSS" / "radipop",
+                        "fe_settings": RADIPOP_PACKAGE_ROOT / "yaml" / "exampleCT.yaml"  }
+    else: 
+        defaults = {"images_and_mask_paths_file": "/path/to/table.xlsx", 
+                        "output_dir": "/path/to/where/to/save/the/features",
+                        "fe_settings": "path/to/exampleCT.yaml"}
+    return defaults
 
 def main_function():
+    d = get_parser_defaults(add_directory_defaults=False)
+
     parser = argparse.ArgumentParser(description="Extract and save radiomics features from NIfTI images (paths provided as an xlsx file.)")
     
-    DATA_ROOT_DIRECTORY = Path(config["DATA_ROOT_DIRECTORY"])
 
     parser.add_argument("--images_and_mask_paths_file", type=Path, 
-                        default=RADIPOP_PACKAGE_ROOT / "data" / "file_paths_and_hvpg_data.xlsx",
+                        default=d["images_and_mask_paths_file"],
                         help="Path to the Excel file containing image and mask paths and patient IDs.")
     
     parser.add_argument("--output_dir", type=Path, 
-                        default=DATA_ROOT_DIRECTORY / "radiomics" / "Dataset125_LSS" / "radipop",
+                        default=d["output_dir"],
                         help="Directory where the extracted features will be saved.")
     
     parser.add_argument("--fe_settings", type=Path, 
-                        default=RADIPOP_PACKAGE_ROOT / "yaml" / "exampleCT.yaml",
+                        default=d["fe_settings"],
                         help="Path to the radiomics feature extraction settings file.")
     
     parser.add_argument("--window_location_middle", type=float, 
