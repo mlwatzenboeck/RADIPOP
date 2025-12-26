@@ -14,8 +14,12 @@ from typing import Union
 import tempfile
 import shutil
 
-import totalsegmentator
-import totalsegmentator.python_api
+try:
+    import totalsegmentator
+    import totalsegmentator.python_api
+    TOTALSEGMENTATOR_AVAILABLE = True
+except ImportError:
+    TOTALSEGMENTATOR_AVAILABLE = False
 
 import radipop_utils 
 import radipop_utils.visualization
@@ -47,6 +51,19 @@ def inference_via_total_segmentor(image_loc: Union[Path, str],
                                   dicom=False, 
                                   output_folder : Union[str, None] = None, 
                                   save_all_masks=False) -> float:
+    """
+    Perform inference using TotalSegmentator for automatic segmentation.
+    
+    Requires the optional 'torch' dependencies. Install with: pip install radipop_utils[torch]
+    
+    Raises:
+        ImportError: If totalsegmentator is not installed.
+    """
+    if not TOTALSEGMENTATOR_AVAILABLE:
+        raise ImportError(
+            "totalsegmentator is required for automatic segmentation. "
+            "Install it with: pip install radipop_utils[torch]"
+        )
     
     if fe_settings_path == None:
         fe_settings_path = radipop_utils.inference.load_fe_settings_from_package()

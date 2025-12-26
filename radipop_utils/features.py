@@ -12,8 +12,8 @@ import numpy as np
 import pandas as pd
 import nibabel as nib
 import pydicom
-import dicom2nifti
-import dicom2nifti.settings as settings
+#import dicom2nifti
+#import dicom2nifti.settings as settings
 import SimpleITK as sitk
 import SimpleITK  # for type hinting
 import skopt

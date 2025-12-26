@@ -5,8 +5,13 @@ os.environ['MKL_SERVICE_FORCE_INTEL'] = '1'
 from pathlib import Path
 from typing import Union, Optional
 
-import totalsegmentator
-import totalsegmentator.python_api
+try:
+    import totalsegmentator
+    import totalsegmentator.python_api
+    TOTALSEGMENTATOR_AVAILABLE = True
+except ImportError:
+    TOTALSEGMENTATOR_AVAILABLE = False
+
 import argparse
 from pprint import pprint
 
@@ -38,6 +43,12 @@ fe_settings_path = None
 model_dir = None
 
 def main_function():
+    if not TOTALSEGMENTATOR_AVAILABLE:
+        raise ImportError(
+            "totalsegmentator is required for automatic segmentation. "
+            "Install it with: pip install radipop_utils[torch]"
+        )
+    
     parser = argparse.ArgumentParser(
     description='Run autosegmentation, extract radiomics and prediction on a single patient.',
     formatter_class=argparse.ArgumentDefaultsHelpFormatter)

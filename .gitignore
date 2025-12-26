@@ -1,5 +1,7 @@
 run_scripts/
 
+CW_collect_results_stashed.ipynb
+
 .vscode
 *.pt
 

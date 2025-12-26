@@ -5,16 +5,19 @@ import csv
 from dotenv import load_dotenv, dotenv_values
 
 from glob import glob
-from typing import List, Union
+from typing import List, Union, Dict, Tuple, Optional
 import shutil
 from pathlib import Path
 import pandas as pd
 import numpy as np
-from typing import Dict, Tuple, Optional
 import nibabel as nib
 from tqdm import tqdm
 import pydicom
-import dicom2nifti
+try:
+    import dicom2nifti
+    DICOM2NIFTI_AVAILABLE = True
+except ImportError:
+    DICOM2NIFTI_AVAILABLE = False
 from glob import glob
 import tempfile
 import shutil
@@ -49,13 +52,23 @@ def dcm2nii(dicom_folder: Path, output_folder: Path,
 
     Notes:
         This function uses pydicom and dicom2nifti libraries to perform the conversion.
+        Requires the optional 'dicom2nifti' package. Install with: pip install radipop_utils[dicom2nifti]
 
     Example:
         dcm_folder = Path('/path/to/dicom/folder')
         output_folder = Path('/path/to/output')
         dcm2nii(dcm_folder, output_folder, verbose=True, out_id=None)
         # Converted id: [patient_id] from [dicom_folder] to [output_folder/patient_id]
+    
+    Raises:
+        ImportError: If dicom2nifti is not installed.
     """
+    if not DICOM2NIFTI_AVAILABLE:
+        raise ImportError(
+            "dicom2nifti is required for DICOM to NIfTI conversion. "
+            "Install it with: pip install radipop_utils[dicom2nifti]"
+        )
+    
     with tempfile.TemporaryDirectory() as tmp:
         tmp = Path(str(tmp))
 
@@ -90,7 +103,7 @@ def dcm2nii(dicom_folder: Path, output_folder: Path,
 
 
 
-def load_dicom_files(folder: Path | str, sort_key=lambda x: int(x.name.split(".")[0])) -> list[pydicom.FileDataset]:
+def load_dicom_files(folder: Union[Path, str], sort_key=lambda x: int(x.name.split(".")[0])) -> List[pydicom.FileDataset]:
     dicom_files = list(folder.glob("*"))
     dicom_files = sorted(dicom_files, key=sort_key)
     dicom_files = [pydicom.dcmread(f) for f in dicom_files]
@@ -196,7 +209,7 @@ def get_attributes(src: str, attributes_list=attributes_list_default):
 
 
 
-def get_patient_name(folder: Path | str) -> str:
+def get_patient_name(folder: Union[Path, str]) -> str:
     dicom_files = load_dicom_files(folder)
     return dicom_files[0].PatientName
 

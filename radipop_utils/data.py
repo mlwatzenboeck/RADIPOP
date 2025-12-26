@@ -18,7 +18,7 @@ from radipop_utils.utils import get_files_dict_by_regex_pattern
 import sklearn
 from sklearn.preprocessing  import StandardScaler
 
-def pandas_read_csv_or_excel(file: str | Path):
+def pandas_read_csv_or_excel(file: Union[str, Path]):
     file_extension = os.path.splitext(file)[1].lower()
     if file_extension == ".csv":
         df = pd.read_csv(file)
