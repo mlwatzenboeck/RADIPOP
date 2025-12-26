@@ -1,7 +1,7 @@
 [project]
 name = "radipop_utils"
 version = "0.1"
-requires-python = ">=3.7"
+requires-python = ">=3.10"
 description = "The radipop_utils package contains useful functions for extracting most important radiomics features from CT images used for HVPG prediction as well as time-to-event prediction (outcome)."
 readme = "README.md"
 authors = [
@@ -44,7 +44,8 @@ dependencies = [
     "ipykernel",
     "jupyter",
     "openpyxl",
-    "pyyaml"
+    "pyyaml",
+    "dicom2nifti<2.6.0"
 ]
 
 [project.scripts]
@@ -67,12 +68,12 @@ torch = [
     "TotalSegmentator"
 ]
 dicom2nifti = [
-    "dicom2nifti"
+    "dicom2nifti<2.6.0"
 ]
 all = [
     "torch>=2.1.2",
     "TotalSegmentator",
-    "dicom2nifti"
+    "dicom2nifti<2.6.0"
 ]
 
 [build-system]
