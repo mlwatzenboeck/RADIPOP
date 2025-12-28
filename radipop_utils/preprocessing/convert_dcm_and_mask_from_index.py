@@ -35,41 +35,6 @@ RADIPOP_PACKAGE_ROOT = path.parent.parent
 
 
 
-def check_inputs(folder_name: str, i_start: int, i_end: int, idx_shift: int) -> None:
-    # some checks: 
-    assert i_end > i_start
-    dcm_folder = Path(folder_name)
-    assert dcm_folder.exists() and dcm_folder.is_dir(), f"Folder does not exist: {dcm_folder}"
-
-    # Check for required .dcm files
-    missing_dcm_files = []
-    for i in range(i_start, i_end + 1):
-        dcm_filename = f"IM-0001-{i:04d}.dcm"
-        dcm_path = dcm_folder / dcm_filename
-        if not dcm_path.exists():
-            missing_dcm_files.append(dcm_filename)
-
-    if missing_dcm_files:
-        print("Missing .dcm files:")
-        for name in missing_dcm_files:
-            print(f"  {name}")
-        assert False, f"{len(missing_dcm_files)} .dcm files are missing from {folder_name}"
-
-    # Check for required .p files (mask files)
-    missing_p_files = []
-    for i in range(i_start, i_end + 1):
-        p_filename = f"{i - idx_shift}.p"
-        p_path = dcm_folder / p_filename
-        if not p_path.exists():
-            missing_p_files.append(p_filename)
-
-    if missing_p_files:
-        print("Missing .p (mask) files:")
-        for name in missing_p_files:
-            print(f"  {name}")
-        assert False, f"{len(missing_p_files)} .p files are missing from {folder_name}"
-
-
 # Note: This function is from the original code and must not be changed!!!
 # BUT it can serve as inspiration for the functions to be written: 
 #  - convert_dcm_from_index(dcm_files: List[str], out_path:str)
@@ -256,14 +221,106 @@ def convert_and_extract2(dcm, mask, cut_indices, flipped_z_axis = False, flip_ma
 
 
 
-DEBUGGING = False
+
+
+def dcm_png_p_paths_matches(folder_name: str) -> pd.DataFrame:
+    """
+    Create a pandas dataframe with matches between .dcm, .png, and .p files.
+    
+    Args:
+        folder_name: Path to the folder containing the files
+        
+    Returns:
+        DataFrame with columns: dcm_name, png_name, pickle_mask_name
+    """
+    folder_path = Path(folder_name)
+    
+    # Get all .dcm files, ignoring those starting with . or _
+    dcm_files = [f for f in folder_path.glob("*.dcm") 
+                 if not f.name.startswith('.') and not f.name.startswith('_')]
+    dcm_files = sorted(dcm_files, key=lambda x: x.name)
+    
+    # Get all .p files, ignoring those starting with . or _
+    p_files = [f for f in folder_path.glob("*.p") 
+               if not f.name.startswith('.') and not f.name.startswith('_')]
+    # Sort by numeric value in filename
+    def get_numeric_key(filename):
+        match = re.search(r'(\d+)', filename.name)
+        return int(match.group(1)) if match else float('inf')
+    p_files = sorted(p_files, key=get_numeric_key)
+    
+    # Get all .png files, ignoring those starting with . or _
+    png_files = [f for f in folder_path.glob("*.png") 
+                 if not f.name.startswith('.') and not f.name.startswith('_')]
+    # Sort by numeric value in filename
+    png_files = sorted(png_files, key=get_numeric_key)
+    
+    # Create dataframe with matching by index position
+    max_length = max(len(dcm_files), len(png_files), len(p_files))
+    data = []
+    
+    for idx in range(max_length):
+        dcm_name = dcm_files[idx].name if idx < len(dcm_files) else None
+        png_name = png_files[idx].name if idx < len(png_files) else None
+        pickle_mask_name = p_files[idx].name if idx < len(p_files) else None
+        
+        # Check for gaps in .dcm files
+        if idx > 0 and idx < len(dcm_files):
+            prev_dcm = dcm_files[idx - 1]
+            curr_dcm = dcm_files[idx]
+            # Extract the last number from filenames to detect gaps (e.g., "IM-0001-0001.dcm" -> 1)
+            prev_matches = re.findall(r'(\d+)', prev_dcm.name)
+            curr_matches = re.findall(r'(\d+)', curr_dcm.name)
+            if prev_matches and curr_matches:
+                # Use the last number in the filename (likely the index)
+                prev_num = int(prev_matches[-1])
+                curr_num = int(curr_matches[-1])
+                if curr_num - prev_num > 1:
+                    print(f"Warning: Gap detected in .dcm files between {prev_dcm.name} and {curr_dcm.name}")
+        
+        data.append({
+            'dcm_name': dcm_name,
+            'png_name': png_name,
+            'pickle_mask_name': pickle_mask_name
+        })
+    
+    df_matches = pd.DataFrame(data)
+    print(f"Created dataframe with {len(df_matches)} rows matching .dcm, .png, and .p files")
+    
+    return df_matches
+
+
+def check_inputs(folder_name: str, i_start: int, i_end: int) -> None:
+    # some checks: 
+    assert i_end > i_start
+    dcm_folder = Path(folder_name)
+    assert dcm_folder.exists() and dcm_folder.is_dir(), f"Folder does not exist: {dcm_folder}"
+
+    # Check for required .dcm files
+    missing_dcm_files = []
+    for i in range(i_start, i_end + 1):
+        dcm_filename = f"IM-0001-{i:04d}.dcm"
+        dcm_path = dcm_folder / dcm_filename
+        if not dcm_path.exists():
+            missing_dcm_files.append(dcm_filename)
+
+    if missing_dcm_files:
+        print("Missing .dcm files:")
+        for name in missing_dcm_files:
+            print(f"  {name}")
+        print( f"{len(missing_dcm_files)} .dcm files are missing from {folder_name}")
+
+
+
+DEBUGGING = True
+
+
 
 if __name__ == "__main__":
     if DEBUGGING:
         folder_name = "/home/clemens/data/RADIPOP_EXTRA/working_env/FINAL.38"
         i_start=1
         i_end=230
-        idx_shift=1
         folder_name_out= "__AUTO__"
         out_root=None
     else: 
@@ -272,7 +329,6 @@ if __name__ == "__main__":
         parser.add_argument("--i_start", type=int, help="Start index for .dcm files", required=True)
         parser.add_argument("--i_end", type=int, help="Start index for .dcm files", required=True)
         parser.add_argument("--folder_name_out", type=str, default="__AUTO__")
-        parser.add_argument("--idx_shift", type=int, help="idx_dcm - idx_shift = idx_mask; [default=1; 0.png -> ...-001.dcm]", default=1)
         parser.add_argument("-o", "--out_root", type=str, help="Path to the output folder; Default: same as folder_name", default=None)
         args = parser.parse_args()
         
@@ -280,7 +336,6 @@ if __name__ == "__main__":
         i_start = args.i_start
         i_end = args.i_end
         folder_name_out = args.folder_name_out
-        idx_shift = args.idx_shift
         out_root = args.out_root
 
     if folder_name_out == "__AUTO__":
@@ -290,7 +345,44 @@ if __name__ == "__main__":
     output_folder = f"{out_root}/{folder_name_out}"
 
 
-    check_inputs(folder_name, i_start, i_end, idx_shift)
+
+
+    check_inputs(folder_name, i_start, i_end)
+
+    # Create pandas dataframe with matches between .dcm, .png, and .p files
+    df_matches = dcm_png_p_paths_matches(folder_name)
+    
+    # Extract numeric index from .dcm filenames and slice according to i_start and i_end
+    def extract_dcm_index(dcm_name):
+        if dcm_name is None:
+            return None
+        matches = re.findall(r'(\d+)', dcm_name)
+        return int(matches[-1]) if matches else None
+    
+    df_matches['dcm_index'] = df_matches['dcm_name'].apply(extract_dcm_index)
+    
+    # Filter rows where .dcm index is between i_start and i_end (inclusive)
+    df_matches = df_matches[
+        (df_matches['dcm_index'] >= i_start) & 
+        (df_matches['dcm_index'] <= i_end)
+    ].copy()
+    
+    # Drop the temporary dcm_index column
+    df_matches = df_matches.drop(columns=['dcm_index'])
+    
+    # Assert that for each .png file in the sliced dataframe there is a matching .p file
+    png_count = df_matches['png_name'].notna().sum()
+    p_count = df_matches['pickle_mask_name'].notna().sum()
+    assert png_count == p_count, \
+        f"Mismatch in sliced dataframe: {png_count} .png files but {p_count} .p files (range {i_start}-{i_end})"
+    
+    # Save the dataframe as CSV to the folder
+    folder_path = Path(folder_name)
+    csv_path = folder_path / "file_matches.csv"
+    df_matches.to_csv(csv_path, index=False)
+    print(f"Saved file matches dataframe to {csv_path}")
+
+
 
     # TODO: 
     # Combine .dcm files to nifty file. 
