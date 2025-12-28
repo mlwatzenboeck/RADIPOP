@@ -59,7 +59,8 @@ def separate_and_link_pngs_and_masks(folder_name: str) -> None:
     
     missing_pngs: Dict[str, List[str]] = {}
     missing_masks: Dict[str, List[str]] = {}
-    
+    number_of_dicoms = {}
+
     for acq_folder in acq_time_folders:
         metadata_csv = acq_folder / "metadata.csv"
         if not metadata_csv.exists():
@@ -71,6 +72,8 @@ def separate_and_link_pngs_and_masks(folder_name: str) -> None:
             reader = csv.DictReader(f)
             rows = list(reader)
         
+        number_of_dicoms[acq_folder.name] = len(rows)
+
         if len(rows) == 0:
             print(f"Warning: metadata.csv is empty in {acq_folder}, skipping...")
             continue
@@ -92,10 +95,9 @@ def separate_and_link_pngs_and_masks(folder_name: str) -> None:
             
             try:
                 dcm_number = _extract_dcm_number(dcm_name)
-                # Apply off-by-one correction (DICOM number 288 corresponds to file 289.png)
                 ##  WHY??? IT should be the other way arround.... TODO   BUG 
                 # Should be 0.png   corresponds to ...-0001.dcm  
-                file_index = dcm_number + 1
+                file_index = dcm_number - 1 
                 
                 # Source files in the original folder
                 png_src = root / f"{file_index}.png"
@@ -137,14 +139,16 @@ def separate_and_link_pngs_and_masks(folder_name: str) -> None:
             print(f"\nMissing PNG files (total: {total_missing_pngs}):")
             for folder, files in missing_pngs.items():
                 if files:
-                    print(f"  {folder}: {len(files)} file(s) - {', '.join(files[:5])}"
+                    N_should = number_of_dicoms[folder]
+                    print(f"  {folder}: num_DICOM = {N_should} | missing:  {len(files)} file(s) - {', '.join(files[:5])}"
                           + (f" ... and {len(files)-5} more" if len(files) > 5 else ""))
         
         if total_missing_masks > 0:
             print(f"\nMissing mask files (total: {total_missing_masks}):")
             for folder, files in missing_masks.items():
                 if files:
-                    print(f"  {folder}: {len(files)} file(s) - {', '.join(files[:5])}"
+                    N_should = number_of_dicoms[folder]
+                    print(f"  {folder}: num_DICOM = {N_should} | missing: {len(files)} file(s) - {', '.join(files[:5])}"
                           + (f" ... and {len(files)-5} more" if len(files) > 5 else ""))
     
     print("Done.")

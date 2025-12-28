@@ -18,7 +18,8 @@ def main_function():
     parser.add_argument(
         "--output_folder",
         type=str,
-        required=True,
+        required=False,
+        default=None, 
         help="Path to the output folder where the converted NIfTI files will be saved."
     )
     
@@ -46,7 +47,10 @@ def main_function():
     
     # Convert string paths to Path objects
     dicom_folder = Path(args.dicom_folder)
-    output_folder = Path(args.output_folder)
+    if args.output_folder == None: 
+        output_folder = dicom_folder
+    else: 
+        output_folder = Path(args.output_folder)
     
     # Handle verbose flag
     verbose = args.verbose and not args.quiet

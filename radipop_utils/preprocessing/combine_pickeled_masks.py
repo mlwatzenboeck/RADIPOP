@@ -123,13 +123,200 @@ def _read_dicom_metadata(dcm_path: Path) -> Tuple[Optional[Tuple[float, float, f
     return spacing, origin, direction
 
 
-def combine_pickled_masks(folder_name: str) -> None:
+def combine_pickled_masks_for_series(acq_folder: Path) -> None:
+    """
+    Combine pickle mask files into a NIfTI file for a single acquisition time series.
+    
+    Loads all .p files from the masks/ subfolder in the given acquisition folder,
+    validates consecutive numbering, and combines them into a single NIfTI file
+    with metadata from DICOM files.
+    
+    Args:
+        acq_folder: Path to the acquisition time folder containing metadata.csv and masks/
+    
+    Raises:
+        FileNotFoundError: If required files/directories are missing
+        RuntimeError: If mask files are not consecutive or cannot be loaded
+    """
+    if not SIMPLEITK_AVAILABLE:
+        raise ImportError(
+            "SimpleITK is required for combining masks. "
+            "Install it with: pip install SimpleITK"
+        )
+    
+    print(f"\nProcessing {acq_folder.name}...")
+    
+    metadata_csv = acq_folder / "metadata.csv"
+    masks_dir = acq_folder / "masks"
+    
+    if not metadata_csv.exists():
+        raise FileNotFoundError(f"metadata.csv not found in {acq_folder}")
+    
+    if not masks_dir.exists() or not masks_dir.is_dir():
+        raise FileNotFoundError(f"masks/ directory not found in {acq_folder}")
+    
+    # Read metadata.csv to get expected DICOM files
+    with metadata_csv.open("r", newline="") as f:
+        reader = csv.DictReader(f)
+        rows = list(reader)
+    
+    if len(rows) == 0:
+        raise RuntimeError(f"metadata.csv is empty in {acq_folder}")
+    
+    # Extract expected DICOM numbers (with off-by-one correction)
+    expected_dcm_indices = []
+    dcm_paths = {}
+    for row in rows:
+        dcm_name = row.get("dcm_name", "")
+        if dcm_name:
+            try:
+                dcm_number = _extract_dcm_number(dcm_name)
+                dcm_index = dcm_number - 1  # off-by-one correction
+                expected_dcm_indices.append(dcm_index)
+                
+                # Store path to DICOM file for metadata extraction
+                dcm_src = row.get("dcm_src", "")
+                if dcm_src:
+                    dcm_paths[dcm_index] = Path(dcm_src)
+            except (ValueError, KeyError):
+                continue
+    
+    if len(expected_dcm_indices) == 0:
+        raise RuntimeError(f"No valid DICOM files found in metadata.csv")
+    
+    expected_dcm_indices = sorted(set(expected_dcm_indices))
+    min_expected = min(expected_dcm_indices)
+    max_expected = max(expected_dcm_indices)
+    
+    # Load all .p files from masks/ directory
+    mask_files = [
+        f for f in masks_dir.iterdir()
+        if f.is_file() and f.suffix == ".p" and not f.name.startswith(".")
+    ]
+    
+    if len(mask_files) == 0:
+        raise FileNotFoundError(f"No .p files found in {masks_dir}")
+    
+    # Extract numbers from mask filenames
+    mask_indices = []
+    mask_files_dict = {}
+    for mask_file in mask_files:
+        try:
+            idx = _extract_mask_number(mask_file.name)
+            mask_indices.append(idx)
+            mask_files_dict[idx] = mask_file
+        except ValueError:
+            print(f"Warning: Skipping invalid mask filename: {mask_file.name}")
+            continue
+    
+    if len(mask_indices) == 0:
+        raise RuntimeError(f"No valid mask files found")
+    
+    mask_indices = sorted(mask_indices)
+    min_mask = min(mask_indices)
+    max_mask = max(mask_indices)
+    
+    # Check for missing beginning/end files (compared to DICOM files)
+    if min_mask > min_expected:
+        missing_beginning = list(range(min_expected, min_mask))
+        print(f"Warning: Missing mask files at beginning: {missing_beginning}")
+    if max_mask < max_expected:
+        missing_end = list(range(max_mask + 1, max_expected + 1))
+        print(f"Warning: Missing mask files at end: {missing_end}")
+    
+    # Validate consecutive numbering (no gaps)
+    expected_mask_indices = list(range(min_mask, max_mask + 1))
+    if mask_indices != expected_mask_indices:
+        missing_in_middle = set(expected_mask_indices) - set(mask_indices)
+        raise RuntimeError(
+            f"Mask files are not consecutive. Missing indices: {sorted(missing_in_middle)}. "
+            f"Found indices: {mask_indices}"
+        )
+    
+    print(f"Found {len(mask_indices)} consecutive mask files (indices {min_mask} to {max_mask})")
+    
+    # Load all mask files
+    masks = []
+    for idx in mask_indices:
+        mask_file = mask_files_dict[idx]
+        try:
+            with mask_file.open("rb") as f:
+                mask = pickle.load(f)
+            masks.append(mask)
+        except Exception as e:
+            raise RuntimeError(f"Error loading mask file {mask_file}: {e}")
+    
+    # Stack masks into 3D array
+    mask_array = np.stack(masks, axis=0)
+    print(f"Combined mask shape: {mask_array.shape}")
+    
+    # Convert to SimpleITK image
+    sitk_image = sitk.GetImageFromArray(mask_array)
+    
+    # Try to extract metadata from a DICOM file
+    # Use the first available DICOM file for metadata
+    dcm_path_for_metadata = None
+    for idx in mask_indices:
+        if idx in dcm_paths and dcm_paths[idx].exists():
+            dcm_path_for_metadata = dcm_paths[idx]
+            break
+    
+    if dcm_path_for_metadata is None:
+        # Try any DICOM file from the metadata
+        for dcm_path in dcm_paths.values():
+            if dcm_path.exists():
+                dcm_path_for_metadata = dcm_path
+                break
+    
+    if dcm_path_for_metadata is not None:
+        spacing, origin, direction = _read_dicom_metadata(dcm_path_for_metadata)
+        
+        if spacing is not None:
+            sitk_image.SetSpacing(spacing)
+            print(f"Set spacing: {spacing}")
+        else:
+            # Default spacing
+            sitk_image.SetSpacing((1.0, 1.0, 1.0))
+            print("Warning: Could not extract spacing from DICOM, using default (1.0, 1.0, 1.0)")
+        
+        if origin is not None:
+            sitk_image.SetOrigin(origin)
+            print(f"Set origin: {origin}")
+        else:
+            sitk_image.SetOrigin((0.0, 0.0, 0.0))
+            print("Warning: Could not extract origin from DICOM, using default (0.0, 0.0, 0.0)")
+        
+        if direction is not None:
+            sitk_image.SetDirection(direction.flatten().tolist())
+            print(f"Set direction matrix")
+        else:
+            # Identity matrix
+            sitk_image.SetDirection((1.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 1.0))
+            print("Warning: Could not extract direction from DICOM, using identity matrix")
+    else:
+        print("Warning: No DICOM file found for metadata extraction, using defaults")
+        sitk_image.SetSpacing((1.0, 1.0, 1.0))
+        sitk_image.SetOrigin((0.0, 0.0, 0.0))
+        sitk_image.SetDirection((1.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 1.0))
+    
+    # Save as NIfTI
+    output_path = masks_dir / "mask.nii.gz"
+    sitk.WriteImage(sitk_image, str(output_path))
+    print(f"Saved combined mask to: {output_path}")
+
+
+def combine_pickled_masks(folder_name: str, series_name: Optional[str] = None) -> None:
     """
     Combine pickle mask files into NIfTI files organized by acquisition time.
     
     For each folder in {folder_name}/by_acqtime/, loads all .p files from masks/
     subfolder, validates consecutive numbering, and combines them into a single
     NIfTI file with metadata from DICOM files.
+    
+    Args:
+        folder_name: Path to the folder containing the DICOM files
+        series_name: Optional name of a specific acquisition time folder to process.
+                     If None, processes all folders.
     """
     if not SIMPLEITK_AVAILABLE:
         raise ImportError(
@@ -148,199 +335,68 @@ def combine_pickled_masks(folder_name: str) -> None:
             "Run dcm_seperation.py first."
         )
     
-    # Get all acquisition time folders
-    acq_time_folders = [
-        d for d in by_acqtime_dir.iterdir()
-        if d.is_dir() and not d.name.startswith(".")
-    ]
-    
-    if len(acq_time_folders) == 0:
-        raise RuntimeError(f"No acquisition time folders found in: {by_acqtime_dir}")
+    # Get acquisition time folders
+    if series_name is not None:
+        # Process only the specified series
+        acq_folder = by_acqtime_dir / series_name
+        if not acq_folder.exists() or not acq_folder.is_dir():
+            raise NotADirectoryError(
+                f"Acquisition time folder '{series_name}' not found in {by_acqtime_dir}"
+            )
+        acq_time_folders = [acq_folder]
+    else:
+        # Get all acquisition time folders
+        acq_time_folders = [
+            d for d in by_acqtime_dir.iterdir()
+            if d.is_dir() and not d.name.startswith(".")
+        ]
+        
+        if len(acq_time_folders) == 0:
+            raise RuntimeError(f"No acquisition time folders found in: {by_acqtime_dir}")
     
     print(f"Found {len(acq_time_folders)} acquisition time folder(s)")
     
     for acq_folder in acq_time_folders:
-        print(f"\nProcessing {acq_folder.name}...")
-        
-        metadata_csv = acq_folder / "metadata.csv"
-        masks_dir = acq_folder / "masks"
-        
-        if not metadata_csv.exists():
-            print(f"Warning: metadata.csv not found in {acq_folder}, skipping...")
+        try:
+            combine_pickled_masks_for_series(acq_folder)
+        except (FileNotFoundError, RuntimeError) as e:
+            print(f"Error processing {acq_folder.name}: {e}")
+            if series_name is not None:
+                # If processing a single series, re-raise the error
+                raise
+            # Otherwise, continue with other folders
             continue
-        
-        if not masks_dir.exists() or not masks_dir.is_dir():
-            print(f"Warning: masks/ directory not found in {acq_folder}, skipping...")
-            continue
-        
-        # Read metadata.csv to get expected DICOM files
-        with metadata_csv.open("r", newline="") as f:
-            reader = csv.DictReader(f)
-            rows = list(reader)
-        
-        if len(rows) == 0:
-            print(f"Warning: metadata.csv is empty in {acq_folder}, skipping...")
-            continue
-        
-        # Extract expected DICOM numbers (with off-by-one correction)
-        expected_dcm_indices = []
-        dcm_paths = {}
-        for row in rows:
-            dcm_name = row.get("dcm_name", "")
-            if dcm_name:
-                try:
-                    dcm_number = _extract_dcm_number(dcm_name)
-                    dcm_index = dcm_number + 1  # off-by-one correction (DICOM number 288 corresponds to file 289)
-                    expected_dcm_indices.append(dcm_index)
-                    
-                    # Store path to DICOM file for metadata extraction
-                    dcm_src = row.get("dcm_src", "")
-                    if dcm_src:
-                        dcm_paths[dcm_index] = Path(dcm_src)
-                except (ValueError, KeyError):
-                    continue
-        
-        if len(expected_dcm_indices) == 0:
-            print(f"Warning: No valid DICOM files found in metadata.csv, skipping...")
-            continue
-        
-        expected_dcm_indices = sorted(set(expected_dcm_indices))
-        min_expected = min(expected_dcm_indices)
-        max_expected = max(expected_dcm_indices)
-        
-        # Load all .p files from masks/ directory
-        mask_files = [
-            f for f in masks_dir.iterdir()
-            if f.is_file() and f.suffix == ".p" and not f.name.startswith(".")
-        ]
-        
-        if len(mask_files) == 0:
-            print(f"Warning: No .p files found in {masks_dir}, skipping...")
-            continue
-        
-        # Extract numbers from mask filenames
-        mask_indices = []
-        mask_files_dict = {}
-        for mask_file in mask_files:
-            try:
-                idx = _extract_mask_number(mask_file.name)
-                mask_indices.append(idx)
-                mask_files_dict[idx] = mask_file
-            except ValueError:
-                print(f"Warning: Skipping invalid mask filename: {mask_file.name}")
-                continue
-        
-        if len(mask_indices) == 0:
-            print(f"Warning: No valid mask files found, skipping...")
-            continue
-        
-        mask_indices = sorted(mask_indices)
-        min_mask = min(mask_indices)
-        max_mask = max(mask_indices)
-        
-        # Check for missing beginning/end files (compared to DICOM files)
-        missing_beginning = []
-        missing_end = []
-        if min_mask > min_expected:
-            missing_beginning = list(range(min_expected, min_mask))
-            print(f"Warning: Missing mask files at beginning: {missing_beginning}")
-        if max_mask < max_expected:
-            missing_end = list(range(max_mask + 1, max_expected + 1))
-            print(f"Warning: Missing mask files at end: {missing_end}")
-        
-        # Validate consecutive numbering (no gaps)
-        expected_mask_indices = list(range(min_mask, max_mask + 1))
-        if mask_indices != expected_mask_indices:
-            missing_in_middle = set(expected_mask_indices) - set(mask_indices)
-            raise RuntimeError(
-                f"Mask files are not consecutive. Missing indices: {sorted(missing_in_middle)}. "
-                f"Found indices: {mask_indices}"
-            )
-        
-        print(f"Found {len(mask_indices)} consecutive mask files (indices {min_mask} to {max_mask})")
-        
-        # Load all mask files
-        masks = []
-        for idx in mask_indices:
-            mask_file = mask_files_dict[idx]
-            try:
-                with mask_file.open("rb") as f:
-                    mask = pickle.load(f)
-                masks.append(mask)
-            except Exception as e:
-                raise RuntimeError(f"Error loading mask file {mask_file}: {e}")
-        
-        # Stack masks into 3D array
-        mask_array = np.stack(masks, axis=0)
-        print(f"Combined mask shape: {mask_array.shape}")
-        
-        # Convert to SimpleITK image
-        sitk_image = sitk.GetImageFromArray(mask_array)
-        
-        # Try to extract metadata from a DICOM file
-        # Use the first available DICOM file for metadata
-        dcm_path_for_metadata = None
-        for idx in mask_indices:
-            if idx in dcm_paths and dcm_paths[idx].exists():
-                dcm_path_for_metadata = dcm_paths[idx]
-                break
-        
-        if dcm_path_for_metadata is None:
-            # Try any DICOM file from the metadata
-            for dcm_path in dcm_paths.values():
-                if dcm_path.exists():
-                    dcm_path_for_metadata = dcm_path
-                    break
-        
-        if dcm_path_for_metadata is not None:
-            spacing, origin, direction = _read_dicom_metadata(dcm_path_for_metadata)
-            
-            if spacing is not None:
-                sitk_image.SetSpacing(spacing)
-                print(f"Set spacing: {spacing}")
-            else:
-                # Default spacing
-                sitk_image.SetSpacing((1.0, 1.0, 1.0))
-                print("Warning: Could not extract spacing from DICOM, using default (1.0, 1.0, 1.0)")
-            
-            if origin is not None:
-                sitk_image.SetOrigin(origin)
-                print(f"Set origin: {origin}")
-            else:
-                sitk_image.SetOrigin((0.0, 0.0, 0.0))
-                print("Warning: Could not extract origin from DICOM, using default (0.0, 0.0, 0.0)")
-            
-            if direction is not None:
-                sitk_image.SetDirection(direction.flatten().tolist())
-                print(f"Set direction matrix")
-            else:
-                # Identity matrix
-                sitk_image.SetDirection((1.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 1.0))
-                print("Warning: Could not extract direction from DICOM, using identity matrix")
-        else:
-            print("Warning: No DICOM file found for metadata extraction, using defaults")
-            sitk_image.SetSpacing((1.0, 1.0, 1.0))
-            sitk_image.SetOrigin((0.0, 0.0, 0.0))
-            sitk_image.SetDirection((1.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 1.0))
-        
-        # Save as NIfTI
-        output_path = masks_dir / "mask.nii.gz"
-        sitk.WriteImage(sitk_image, str(output_path))
-        print(f"Saved combined mask to: {output_path}")
     
     print("\nDone.")
 
 
+DEBUGGING=True
+
 if __name__ == "__main__":
-    parser = argparse.ArgumentParser(
-        description="Combine pickle mask files into NIfTI files"
-    )
-    parser.add_argument(
-        "--folder_name",
-        type=str,
-        help="Path to the folder containing the DICOM files",
-        required=True
-    )
-    args = parser.parse_args()
-    combine_pickled_masks(folder_name=args.folder_name)
+    if DEBUGGING: 
+        folder_name = "/home/clemens/data/RADIPOP_EXTRA/working_env//FINAL.11"
+        series_name = "090300.497405"
+
+    else: 
+        parser = argparse.ArgumentParser(
+            description="Combine pickle mask files into NIfTI files"
+        )
+        parser.add_argument(
+            "--folder_name",
+            type=str,
+            help="Path to the folder containing the DICOM files",
+            required=True
+        )
+        parser.add_argument(
+            "--series",
+            type=str,
+            help="Optional: Name of a specific acquisition time folder to process. "
+                "If not provided, processes all folders.",
+            default=None
+        )
+        args = parser.parse_args()
+        folder_name = args.folder_name
+        series_name = args.series
+
+    combine_pickled_masks(folder_name=folder_name, series_name=series_name)
 

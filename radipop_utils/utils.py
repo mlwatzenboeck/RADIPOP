@@ -69,15 +69,64 @@ def dcm2nii(dicom_folder: Path, output_folder: Path,
             "Install it with: pip install radipop_utils[dicom2nifti]"
         )
     
+    # Validate input paths and expand user directories
+    dicom_folder = Path(dicom_folder).expanduser().resolve()
+    output_folder = Path(output_folder).expanduser().resolve()
+    
+    if not dicom_folder.exists():
+        raise FileNotFoundError(f"DICOM folder does not exist: {dicom_folder}")
+    if not dicom_folder.is_dir():
+        raise NotADirectoryError(f"DICOM folder is not a directory: {dicom_folder}")
+    
+    # Ensure output folder exists (os.makedirs will create parent dirs too, but good to be explicit)
+    output_folder.mkdir(parents=True, exist_ok=True)
+    
+    # Check if there are any files
+    dicom_files = list(dicom_folder.glob('*'))
+    if not dicom_files:
+        raise FileNotFoundError(f"No files found in DICOM folder: {dicom_folder}")
+    
+    if verbose:
+        print(f"Converting DICOM files from: {dicom_folder} ({len(dicom_files)} items)")
+    
     with tempfile.TemporaryDirectory() as tmp:
         tmp = Path(str(tmp))
 
-        # convert dicom directory to nifti
-        dicom2nifti.convert_directory(dicom_folder, str(tmp),
-                                      compression=True, reorient=True)
+        # Disable slice increment validation (often needed for problematic DICOM files)
+        try:
+            import dicom2nifti.settings as dicom2nifti_settings
+            dicom2nifti_settings.disable_validate_slice_increment()
+        except (ImportError, AttributeError):
+            # Settings might not be available in all versions, continue anyway
+            pass
 
-        #looks for the first NIfTI file (*nii.gz) in temp
-        nii = next(tmp.glob('*nii.gz'))
+        # convert dicom directory to nifti
+        try:
+            dicom2nifti.convert_directory(str(dicom_folder), str(tmp),
+                                          compression=True, reorient=True)
+        except Exception as e:
+            raise RuntimeError(
+                f"Failed to convert DICOM to NIfTI. Error: {str(e)}\n"
+                f"DICOM folder: {dicom_folder}\n"
+                f"Output folder: {tmp}"
+            ) from e
+
+        #looks for the first NIfTI file (*.nii.gz) in temp
+        nii_files = list(tmp.glob('*.nii.gz'))
+        if not nii_files:
+            # Check for uncompressed .nii files as fallback
+            nii_files = list(tmp.glob('*.nii'))
+            if not nii_files:
+                raise FileNotFoundError(
+                    f"No NIfTI files (*.nii.gz or *.nii) were created during conversion. "
+                    f"Conversion may have failed.\n"
+                    f"DICOM folder: {dicom_folder}\n"
+                    f"Temporary directory: {tmp}\n"
+                    f"Contents: {list(tmp.iterdir())}\n"
+                    f"This might indicate that the DICOM files cannot be converted, "
+                    f"or that they are not in the expected format."
+                )
+        nii = nii_files[0]
 
         if out_id == None:
             # get patient_id from dicom data:
