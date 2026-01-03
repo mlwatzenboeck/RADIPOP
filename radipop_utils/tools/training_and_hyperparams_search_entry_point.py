@@ -3,7 +3,6 @@ from pathlib import Path
 import yaml
 import pandas as pd
 import numpy as np
-import pickle
 from pprint import pprint
 import argparse
 
@@ -144,7 +143,7 @@ def main_function():
     cv_res.to_excel(dst)
     print("Saved hyperparams search to : ", dst)
 
-    # #### save model trained on the whole training data set and optimal paramters
+    # #### Extract and save optimal hyperparameters
     idx_best_EN_model = cv_res["mean_test_score"][:NUM_SEARCHES].argmax()
     idx_best_RF_model = cv_res["mean_test_score"][NUM_SEARCHES:].argmax() + NUM_SEARCHES
 
@@ -166,38 +165,8 @@ def main_function():
     with open(dst, 'w') as outfile:
         yaml.dump(data, outfile, default_flow_style=False)
         print("saved params to ", dst)
-
-    # save optimal models including the scaler
-    # ---- set best performing en/rf models
-    # create a pipeline
-    reg_RF = Pipeline([
-        ('scaler', StandardScaler()),   # will be fit to traing data again. But is is ok. I just wanted to have the same scaler for each CV model 
-        ('feature_selection', SpearmanReducerCont()),
-        ('regression', RandomForestRegressor())
-    ])
-    reg_RF.set_output(transform="pandas")
-    # Set params
-    np.random.seed(2023)
-    reg_RF.set_params(**cv_res.iloc[idx_best_RF_model, :].params)
-    reg_RF.fit(df_Tr_X, Y_Tr)
-    dst = outdir / f"SpearmanRed1_RF_opt.p"
-    with open(dst, "wb") as fp:
-        pickle.dump(reg_RF, fp)
-        print("Saved model to ", dst)
-
-    # create a pipeline
-    reg_EN = Pipeline([
-        ('scaler', StandardScaler()),
-        ('feature_selection', SpearmanReducerCont()),
-        ('regression', ElasticNet())
-    ])
-    reg_EN.set_output(transform="pandas")
-    reg_EN.set_params(**cv_res.iloc[idx_best_EN_model, :].params)
-    reg_EN.fit(df_Tr_X, Y_Tr)
-    dst = outdir / f"SpearmanRed1_EN_opt.p"
-    with open(dst, "wb") as fp:
-        pickle.dump(reg_EN, fp)
-        print("Saved model to ", dst)
+    
+    print("\nHyperparameter search completed. Use train_with_optimal_hp.py to fit and save models with these optimal parameters.")
 
 
 if __name__ == "__main__":

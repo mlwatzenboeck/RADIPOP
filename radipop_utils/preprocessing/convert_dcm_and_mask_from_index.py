@@ -30,6 +30,8 @@ from PIL import Image
 import radipop_utils
 import radipop_utils.conversion_utils_mw_with_reporting_function as cu
 import radipop_utils.features
+import radipop_utils.utils
+import tempfile
 path = Path(os.path.abspath(radipop_utils.__file__))
 RADIPOP_PACKAGE_ROOT = path.parent.parent
 
@@ -319,8 +321,10 @@ DEBUGGING = True
 if __name__ == "__main__":
     if DEBUGGING:
         folder_name = "/home/clemens/data/RADIPOP_EXTRA/working_env/FINAL.38"
-        i_start=1
-        i_end=230
+        i_start=400
+        i_end=600
+        #i_start=1
+        #i_end=230
         folder_name_out= "__AUTO__"
         out_root=None
     else: 
@@ -383,19 +387,183 @@ if __name__ == "__main__":
     print(f"Saved file matches dataframe to {csv_path}")
 
 
-
-    # TODO: 
-    # Combine .dcm files to nifty file. 
-    # Maybe need to first create links in temorary directory and then convert with 
-    #     radipop_utils.utils.dcm2nii(
-    #     dicom_folder=dicom_folder,
-    #     output_folder=output_folder,
-    #     out_id="nii",
-    #     verbose=verbose
-    # )
+    # Combine .dcm files to nifty file
+    # Create a temporary directory with symlinks to the relevant .dcm files
+    with tempfile.TemporaryDirectory() as tmp_dir:
+        tmp_dir = Path(tmp_dir)
+        
+        # Create symlinks to the relevant .dcm files from df_matches
+        dcm_files_to_convert = df_matches['dcm_name'].dropna()
+        for dcm_name in dcm_files_to_convert:
+            src_path = folder_path / dcm_name
+            if src_path.exists():
+                dst_path = tmp_dir / dcm_name
+                dst_path.symlink_to(src_path)
+            else:
+                print(f"Warning: .dcm file not found: {src_path}")
+        
+        # Convert DICOM files to NIfTI
+        output_folder_path = Path(output_folder)
+        output_folder_path.mkdir(parents=True, exist_ok=True)
+        
+        print(f"Converting {len(dcm_files_to_convert)} .dcm files to NIfTI format...")
+        radipop_utils.utils.dcm2nii(
+            dicom_folder=tmp_dir,
+            output_folder=output_folder_path,
+            out_id="nii",
+            verbose=True
+        )
+        print(f"NIfTI file saved to {output_folder_path}")
     
 
-    # TODO: 
-    # create list for correspondong .p files. And merge in similar way as for convert_and_extract2
+    # Process .p mask files and create liver and spleen masks
+    # Extract .p files from df_matches
+    p_files_to_process = df_matches['pickle_mask_name'].dropna()
+    
+    if len(p_files_to_process) > 0:
+        print(f"Processing {len(p_files_to_process)} .p mask files...")
+        
+        # Default parameters matching convert_and_extract2
+        flip_mask = True
+        liver_label = 1
+        spleen_label = 2
+        
+        # Sort .p files by numeric position extracted from filename
+        def get_numeric_key(p_name):
+            match = re.search(r'(\d+)', p_name)
+            return int(match.group(1)) if match else float('inf')
+        
+        p_files_sorted = sorted(p_files_to_process, key=get_numeric_key)
+        
+        # Load masks using pickle
+        masks = []
+        for p_name in p_files_sorted:
+            p_path = folder_path / p_name
+            if p_path.exists():
+                masks.append(pickle.load(open(p_path, "rb")))
+            else:
+                print(f"Warning: .p file not found: {p_path}")
+        
+        if len(masks) == 0:
+            print("Warning: No valid .p mask files found. Skipping mask processing.")
+        else:
+            # Apply flip_mask if needed
+            if flip_mask:
+                masks = masks[::-1]
+            
+            # Stack masks into 3D numpy array
+            mask = np.stack(masks, axis=0)
+            print(f"Mask dtype: {mask.dtype}")
+            
+            # Plot histogram of mask intensities when debugging
+            if DEBUGGING:
+                plt.figure(figsize=(10, 6))
+                plt.hist(mask.flatten(), bins=500, edgecolor='black')
+                plt.xlabel('Mask Intensity Value')
+                plt.ylabel('Frequency (log scale)')
+                plt.yscale('log')
+                plt.title(f'Histogram of Mask Intensities (shape: {mask.shape})')
+                plt.grid(True, alpha=0.3)
+                print(f"Mask value range: [{mask.min()}, {mask.max()}]")
+                print(f"Unique mask values: {np.unique(mask)}")
+                plt.show()
+            
+            # Assert mask shape
+            assert mask.shape[1:] == (512, 512), f"Expected mask shape (N, 512, 512), got {mask.shape}"
+            
+            # Apply mask coordinate transformation and flipping (similar to convert_and_extract2 lines 154-159)
+            mask_coords = [0, 0, 512, 512]
+            mask_new = np.zeros((mask.shape[0], 512, 512))
+            for zi in range(mask.shape[0]):
+                mask_new[zi, mask_coords[0]:mask_coords[2], mask_coords[1]:mask_coords[3]] = mask[zi, :, :]
+                mask_new[zi, :, :] = mask_new[zi, ::-1, :]
+            
+            mask = mask_new
+            print(f"Processed mask dtype: {mask.dtype}")
+            
+            # Save original mask with all tissue types when debugging (for ITK-SNAP viewing)
+            if DEBUGGING:
+                # Convert to int64 for ITK-SNAP compatibility
+                mask_original = mask.astype(np.int64)
+                
+                # Load reference NIfTI for spatial information (will be loaded again later, but that's fine)
+                nifti_ref_path = output_folder_path / "nii" / "base.nii.gz"
+                nifti_ref = None
+                if nifti_ref_path.exists():
+                    nifti_ref = sitk.ReadImage(str(nifti_ref_path))
+                
+                # Convert to SimpleITK image
+                mask_original_sitk = sitk.GetImageFromArray(mask_original)
+                
+                # Copy spatial information if available
+                if nifti_ref is not None:
+                    mask_original_sitk.CopyInformation(nifti_ref)
+                
+                # Save original mask
+                mask_original_path = output_folder_path / "mask_original_all_tissues.nii.gz"
+                sitk.WriteImage(mask_original_sitk, str(mask_original_path))
+                print(f"Saved original mask (all tissue types) to {mask_original_path}")
+            
+            # Create masks for liver and spleen (similar to convert_and_extract2 lines 176-183)
+            mask_liver = mask.copy()
+            mask_liver[np.where(mask_liver != liver_label)] = 0
+            mask_liver[np.where(mask_liver == liver_label)] = 1
+            
+            mask_spleen = mask.copy()
+            mask_spleen[np.where(mask_spleen != spleen_label)] = 0
+            mask_spleen[np.where(mask_spleen == spleen_label)] = 1
+            
+            # Load the converted DICOM NIfTI file to copy spatial information
+            nifti_ref_path = output_folder_path / "nii" / "base.nii.gz"
+            nifti_ref = None
+            if nifti_ref_path.exists():
+                nifti_ref = sitk.ReadImage(str(nifti_ref_path))
+            else:
+                print(f"Warning: Reference NIfTI file not found at {nifti_ref_path}. Cannot copy spatial information.")
+                print("Saving masks without spatial information.")
+            
+            # Convert liver and spleen mask arrays to SimpleITK images
+            mask_liver_sitk = sitk.GetImageFromArray(mask_liver)
+            mask_spleen_sitk = sitk.GetImageFromArray(mask_spleen)
+            
+            # Copy spatial information from the DICOM NIfTI image if available
+            if nifti_ref is not None:
+                mask_liver_sitk.CopyInformation(nifti_ref)
+                mask_spleen_sitk.CopyInformation(nifti_ref)
+            
+            # Save masks as NIfTI files
+            mask_liver_path = output_folder_path / "mask_liver.nii.gz"
+            mask_spleen_path = output_folder_path / "mask_spleen.nii.gz"
+            
+            sitk.WriteImage(mask_liver_sitk, str(mask_liver_path))
+            sitk.WriteImage(mask_spleen_sitk, str(mask_spleen_path))
+            
+            print(f"Saved liver mask to {mask_liver_path}")
+            print(f"Saved spleen mask to {mask_spleen_path}")
+            
+            # # Save masks for each unique integer value when debugging
+            # if DEBUGGING and False:
+            #     unique_values = np.unique(mask)
+            #     print(f"Saving individual masks for each unique value: {unique_values}")
+                
+            #     for value in unique_values:
+            #         # Create binary mask for this value
+            #         mask_value = mask.copy()
+            #         mask_value[np.where(mask_value != value)] = 0
+            #         mask_value[np.where(mask_value == value)] = 1
+                    
+            #         # Convert to SimpleITK image
+            #         mask_value_sitk = sitk.GetImageFromArray(mask_value)
+                    
+            #         # Copy spatial information if available
+            #         if nifti_ref is not None:
+            #             mask_value_sitk.CopyInformation(nifti_ref)
+                    
+            #         # Save mask
+            #         mask_value_path = output_folder_path / f"mask_value_{int(value)}.nii.gz"
+            #         sitk.WriteImage(mask_value_sitk, str(mask_value_path))
+            #         print(f"Saved mask for value {int(value)} to {mask_value_path}")
+    else:
+        print("No .p mask files found in df_matches. Skipping mask processing.")
 
     

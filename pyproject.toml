@@ -53,9 +53,12 @@ radipop_extract_features = "radipop_utils.tools.extract_features_entry_point:mai
 radipop_extract_features_many_times = "radipop_utils.tools.extract_features_from_many_patients_entry_point:main_function"
 radipop_suggest_binwidth = "radipop_utils.tools.suggest_radiomics_binwidth_entry_point:main_function"
 radipop_training_and_hyperparams_search = "radipop_utils.tools.training_and_hyperparams_search_entry_point:main_function"
+radipop_train_with_optimal_hp = "radipop_utils.tools.train_with_optimal_hp:main_function"
 radipop_evaluate_model = "radipop_utils.tools.evaluate_model_entry_point:main_function"
 radipop_segment_and_predict = "radipop_utils.tools.auto_segmentation_and_prediction_entry_point:main_function"
 radipop_combine_radiomics_with_scalar_target_and_split = "radipop_utils.tools.combine_radiomics_with_scalar_target_and_split:main_function"
+radipop_pipeline_dcm_separation_dcm2nii_totalseg = "radipop_utils.tools.pipeline_dcm_separation_dcm2nii_totalseg_entry_point:main_function"
+radipop_combine_masks_and_extract_features = "radipop_utils.tools.combine_masks_and_extract_features_entry_point:main_function"
 
 [project.optional-dependencies]
 dev = [

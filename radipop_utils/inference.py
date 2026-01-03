@@ -25,14 +25,45 @@ from numpy.typing import ArrayLike
 
 
 import pickle
+import joblib
 import importlib.resources as pkg_resources
 
 def load_model_from_package(model_folder: str = "small_dataset_auto_seg_spacing_111_WFD", model_name : str = "SpearmanRed1_RF_opt.p") -> Pipeline:
     # Load the model from the package's models directory
     print(f"Loading model from package: {model_folder}/{model_name}")
     with pkg_resources.path(f'radipop_utils.data_trained_models.{model_folder}', model_name) as model_path:
-        with open(model_path, 'rb') as model_file:
-            loaded_model = pickle.load(model_file)
+        # Try joblib first (preferred), fall back to pickle
+        if model_name.endswith('.joblib'):
+            loaded_model = joblib.load(model_path)
+        else:
+            with open(model_path, 'rb') as model_file:
+                loaded_model = pickle.load(model_file)
+    return loaded_model
+
+
+def load_model_joblib(model_path: Union[str, Path]) -> Pipeline:
+    """
+    Load a model from a joblib file.
+    
+    This is an alternative to pickle loading that provides better cross-platform
+    compatibility and is more efficient for numpy arrays.
+    
+    Parameters:
+    -----------
+    model_path : Union[str, Path]
+        Path to the .joblib model file
+        
+    Returns:
+    --------
+    Pipeline
+        The loaded scikit-learn Pipeline model
+    """
+    model_path = Path(model_path)
+    if not model_path.exists():
+        raise FileNotFoundError(f"Model file not found: {model_path}")
+    
+    print(f"Loading model from joblib file: {model_path}")
+    loaded_model = joblib.load(model_path)
     return loaded_model
 
 
@@ -81,9 +112,19 @@ def load_models_and_params(model_dir: Union[str, Path]) -> Tuple[Dict[str, Pipel
             loaded_hyperparams = yaml.safe_load(f)
         loaded_params[model] = loaded_hyperparams
 
-        # Load the model
-        filename = model_dir / f"SpearmanRed1_{model}_opt.p"
-        loaded_model = pickle.load(open(filename, 'rb'))
+        # Load the model - try joblib first, fall back to pickle
+        filename_joblib = model_dir / f"SpearmanRed1_{model}_opt.joblib"
+        filename_pickle = model_dir / f"SpearmanRed1_{model}_opt.p"
+        
+        if filename_joblib.exists():
+            loaded_model = joblib.load(filename_joblib)
+            print(f"Loaded {model} model from joblib: {filename_joblib}")
+        elif filename_pickle.exists():
+            loaded_model = pickle.load(open(filename_pickle, 'rb'))
+            print(f"Loaded {model} model from pickle: {filename_pickle}")
+        else:
+            raise FileNotFoundError(f"Model file not found for {model}. Expected {filename_joblib} or {filename_pickle}")
+        
         loaded_models[model] = loaded_model
 
     return loaded_models, loaded_params, models_bare
