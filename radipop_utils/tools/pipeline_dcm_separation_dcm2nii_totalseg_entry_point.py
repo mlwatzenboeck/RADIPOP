@@ -1,5 +1,6 @@
 import argparse
 import subprocess
+import shutil
 from pathlib import Path
 from tqdm import tqdm
 
@@ -114,48 +115,45 @@ def main_function():
                 print(f"  Step 2: Converting DICOM to NIfTI for {acq_folder.name}")
             
             # dcm2nii creates a subfolder with the out_id and places base.nii.gz there
-            # We'll use the acquisition time as the out_id
-            out_id = acq_folder.name
+            # To avoid nested folders, we'll use a temp out_id, then move base.nii.gz up
+            temp_out_id = "temp_convert"
             
             radipop_utils.utils.dcm2nii(
                 dicom_folder=acq_folder,
                 output_folder=acq_folder,  # Output in the same folder
-                out_id=out_id,
+                out_id=temp_out_id,
                 verbose=not args.quiet
             )
             
-            # The output will be in acq_folder / out_id / base.nii.gz
-            nii_output_folder = acq_folder / out_id
-            nii_file = nii_output_folder / "base.nii.gz"
+            # The output will be in acq_folder / temp_out_id / base.nii.gz
+            temp_nii_folder = acq_folder / temp_out_id
+            temp_nii_file = temp_nii_folder / "base.nii.gz"
             
-            if not nii_file.exists():
-                raise FileNotFoundError(f"Expected NIfTI file not found: {nii_file}")
+            if not temp_nii_file.exists():
+                raise FileNotFoundError(f"Expected NIfTI file not found: {temp_nii_file}")
             
+            # Move base.nii.gz directly to acq_folder to avoid nested structure
+            nii_file = acq_folder / "base.nii.gz"
+            shutil.move(str(temp_nii_file), str(nii_file))
+            
+            # Remove the temporary subfolder if it's empty
+            try:
+                temp_nii_folder.rmdir()
+            except OSError:
+                # Folder not empty, leave it
+                pass
+            
+            nii_output_folder = acq_folder
             if not args.quiet:
                 print(f"  Step 2 completed: NIfTI conversion done. Output: {nii_file}\n")
         else:
-            # Try to find existing NIfTI file
-            # Look for subfolders that might contain base.nii.gz
-            nii_file = None
-            nii_output_folder = None
-            for subfolder in acq_folder.iterdir():
-                if subfolder.is_dir():
-                    potential_nii = subfolder / "base.nii.gz"
-                    if potential_nii.exists():
-                        nii_file = potential_nii
-                        nii_output_folder = subfolder
-                        break
+            # Try to find existing NIfTI file directly in acq_folder
+            nii_file = acq_folder / "base.nii.gz"
+            nii_output_folder = acq_folder
             
-            if nii_file is None:
-                # Try directly in acq_folder
-                potential_nii = acq_folder / "base.nii.gz"
-                if potential_nii.exists():
-                    nii_file = potential_nii
-                    nii_output_folder = acq_folder
-            
-            if nii_file is None:
+            if not nii_file.exists():
                 raise FileNotFoundError(
-                    f"Could not find base.nii.gz in {acq_folder} or its subfolders.\n"
+                    f"Could not find base.nii.gz in {acq_folder}.\n"
                     "Did you run the dcm2nii step? (Remove --skip_dcm2nii flag if needed)."
                 )
             

@@ -109,8 +109,9 @@ def main_function():
     parser.add_argument(
         "--output_dir",
         type=str,
-        required=True,
-        help="Directory where extracted features will be saved."
+        required=False,
+        default=None,
+        help="Directory where extracted features will be saved. If None, features will be saved in the same directory as the combined mask."
     )
     
     parser.add_argument(
@@ -150,7 +151,13 @@ def main_function():
     # Convert to Path and resolve
     base_folder = Path(args.base_folder).expanduser().resolve()
     fe_settings_path = Path(args.fe_settings).expanduser().resolve()
-    output_dir = Path(args.output_dir).expanduser().resolve()
+    
+    if args.output_dir is not None:
+        output_dir = Path(args.output_dir).expanduser().resolve()
+        # Create output directory if specified
+        output_dir.mkdir(parents=True, exist_ok=True)
+    else:
+        output_dir = None  # Will be set per acquisition folder
     
     if not base_folder.is_dir():
         raise NotADirectoryError(f"Base folder does not exist: {base_folder}")
@@ -176,34 +183,18 @@ def main_function():
         print(f"Found {len(acq_folders)} acquisition time folder(s):")
         for acq_folder in acq_folders:
             print(f"  - {acq_folder.name}")
+        if output_dir is None:
+            print("  Note: Features will be saved in each acquisition folder (--output_dir not specified)")
         print()
-    
-    # Create output directory
-    output_dir.mkdir(parents=True, exist_ok=True)
     
     # Process each acquisition time folder
     for acq_folder in tqdm(acq_folders, desc="Processing acquisition folders", disable=args.quiet):
         if not args.quiet:
             print(f"\nProcessing: {acq_folder.name}")
         
-        # Find the NIfTI conversion output folder (should be acq_folder / acq_folder.name)
-        nii_output_folder = acq_folder / acq_folder.name
-        if not nii_output_folder.exists():
-            # Try to find any subfolder with base.nii.gz
-            nii_output_folder = None
-            for subfolder in acq_folder.iterdir():
-                if subfolder.is_dir():
-                    if (subfolder / "base.nii.gz").exists():
-                        nii_output_folder = subfolder
-                        break
-            
-            if nii_output_folder is None:
-                raise FileNotFoundError(
-                    f"Could not find NIfTI conversion output folder in {acq_folder}.\n"
-                    "Expected structure: {acq_folder}/{acq_folder.name}/base.nii.gz"
-                )
-        
-        base_nii_file = nii_output_folder / "base.nii.gz"
+        # NIfTI file should be directly in acq_folder (no nested subfolder)
+        nii_output_folder = acq_folder
+        base_nii_file = acq_folder / "base.nii.gz"
         if not base_nii_file.exists():
             raise FileNotFoundError(f"base.nii.gz not found: {base_nii_file}")
         
@@ -245,6 +236,12 @@ def main_function():
             if not args.quiet:
                 print(f"  Step 2: Extracting radiomics features for {acq_folder.name}")
             
+            # Determine output directory: use provided output_dir or same directory as combined mask
+            if output_dir is None:
+                feature_output_dir = nii_output_folder
+            else:
+                feature_output_dir = output_dir
+            
             # Use acquisition folder name as patient ID
             patient_id = acq_folder.name
             
@@ -252,7 +249,7 @@ def main_function():
                 patientid=patient_id,
                 image_loc=base_nii_file,
                 mask_loc=combined_mask_file,
-                output_dir=output_dir,
+                output_dir=feature_output_dir,
                 fe_settings_path=fe_settings_path,
                 tissue_class_dct={"liver": 1, "spleen": 2},  # Combined mask: 1=liver, 2=spleen
                 check_existence=True,
@@ -262,7 +259,8 @@ def main_function():
             )
             
             if not args.quiet:
-                print(f"  Step 2 completed: Features extracted for {patient_id}\n")
+                print(f"  Step 2 completed: Features extracted for {patient_id}")
+                print(f"  Features saved to: {feature_output_dir / patient_id}\n")
         else:
             if not args.quiet:
                 print(f"  Step 2: Skipping feature extraction (--skip_feature_extraction flag set).\n")
@@ -270,7 +268,10 @@ def main_function():
     if not args.quiet:
         print("\n" + "="*60)
         print("Mask combination and feature extraction completed successfully!")
-        print(f"Features saved to: {output_dir}")
+        if output_dir is not None:
+            print(f"Features saved to: {output_dir}")
+        else:
+            print("Features saved in each acquisition folder")
         print("="*60)
 
 
