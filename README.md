@@ -6,6 +6,8 @@ This repository accompanies the manuscript
 >
 > Celine Sin, Martin L. Watzenboeck, Eugenia Iofinova, Lorenz Balcar, Georg Semmler, Bernhard Scheiner, Katharina Lampichler, Mattias Mandorfer, Lucile Moga, Pierre-Emmanuel Rautou, Maxime Ronot, Jörg Menche, Thomas Reiberger, Martina Scharitzer
 
+It was published in Liver Internatinal 2026: [DOI: 10.1111/liv.70633](https://doi.org/10.1111/liv.70633).
+
 This repository contains scripts and tools for radiomics analysis used in the study, including image processing, feature extraction, feature selection, and model training.
 
 Additional related scripts for the feature extraction of the training cohort are available at [https://github.com/menchelab/radipop_scripts](https://github.com/menchelab/radipop_scripts).
@@ -16,7 +18,8 @@ Our custom segmentation software can be provided upon request.
 <img src="https://user-images.githubusercontent.com/24319152/237040958-8ee75b95-eb99-4b91-a0b1-7c9071f80a96.png" style="width: 55vw; min-width: 330px;"> -->
 
  
-<img src="fig/graphical_abstract.png" style="width: 55vw; min-width: 330px;">
+<!---  <img src="fig/graphical_abstract.png" style="width: 55vw; min-width: 330px;">    -->
+<img src="fig/Graphical abstract.revision.jpg" style="width: 55vw; min-width: 330px;">
 
 
 ### Main content
@@ -44,7 +47,28 @@ pip install -e .
 ```
 
 
+
+### Citation: 
+
+```bash 
+@article{WatzenboeckSin:2026:LiverInternational,
+  author = {Sin, Celine and Watzenboeck, Martin Luther and Iofinova, Eugenia and Balcar, Lorenz and Semmler, Georg and Scheiner, Bernhard and Lampichler, Katharina and Mandorfer, Mattias and Moga, Lucile and Rautou, Pierre-Emmanuel and Ronot, Maxime and Menche, Jörg and Reiberger, Thomas and Scharitzer, Martina},
+ title = {Radiomics-Based Assessment of Portal Hypertension Severity and Risk Stratification of Cirrhotic Patients Using Routine CT Scans},
+ journal = {Liver International},
+ volume = {46},
+ number = {5},
+ pages = {e70633},
+ keywords = {computed tomography, liver, portal hypertension, radiomics, spleen},
+ doi = {https://doi.org/10.1111/liv.70633},
+ url = {https://onlinelibrary.wiley.com/doi/abs/10.1111/liv.70633},
+ eprint = {https://onlinelibrary.wiley.com/doi/pdf/10.1111/liv.70633},
+ note = {e70633 LIVint-25-01504},
+ year = {2026}
+}
+```
+
+
 ### Further content 
-Moreover, we provide a pipeline and a brief tutorial how to make a similar analysis with your own data in: [tutorials/](tutorials). *Note:* This part is currently under development.
+Moreover, we provide a pipeline and a brief tutorial how to make a similar analysis with your own data in: [tutorials/](tutorials). *Note:* This part is currently under development. 
 
 
